@@ -1,0 +1,2586 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import ImpactGalleryAdmin from "../components/ImpactGalleryAdmin.jsx";
+import SuccessStoriesAdmin from "../components/SuccessStoriesAdmin.jsx";
+import NewsAdmin from "../components/NewsAdmin.jsx";
+import adminService from "../services/adminService";
+import campService from "../services/campService";
+import donorService from "../services/donorService";
+import { QRCodeCanvas } from "qrcode.react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+// CSS migrated to Tailwind
+
+
+// Date Helper Functions
+const toDate = (dateString) => dateString ? new Date(dateString) : null;
+const isUpcoming = (date) => {
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d >= today;
+};
+const isSoon = (date, days) => {
+  if (!date) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const diffTime = d.getTime() - today.getTime();
+  const diffDays = diffTime / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= days;
+};
+const daysUntil = (date) => {
+  if (!date) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  const diffTime = d.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+};
+
+const Admin = () => {
+  const [currentView, setCurrentView] = useState("dashboard"); // "dashboard" | "camps" | "users" | "enquiries" | "organizers"
+  const [donors, setDonors] = useState([]);
+  const [camps, setCamps] = useState([]);
+  const [selectedCamp, setSelectedCamp] = useState(null);
+  const [showQR, setShowQR] = useState({});
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loadingDonors, setLoadingDonors] = useState(false);
+  const [loadingCamps, setLoadingCamps] = useState(false);
+
+  const [organizersList, setOrganizersList] = useState([]);
+  const [loadingOrganizers, setLoadingOrganizers] = useState(false);
+
+  // --- Blood Requests States ---
+  const [bloodRequests, setBloodRequests] = useState([]);
+  const [loadingBloodRequests, setLoadingBloodRequests] = useState(false);
+
+  // Donor Edit states
+  const [editDonorId, setEditDonorId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+
+  // Camp Edit states
+  const [editCampId, setEditCampId] = useState(null);
+  const [editCampForm, setEditCampForm] = useState({});
+
+  const [newCamp, setNewCamp] = useState({
+    name: "",
+    location: "",
+    date: "",
+    organizerId: "",
+    organizerName: "",
+    organizerContact: "",
+    proName: "",
+    hospitalName: "",
+  });
+
+  const [campQuery, setCampQuery] = useState("");
+  const [onlyComingSoon, setOnlyComingSoon] = useState(false);
+  const [upcomingSort, setUpcomingSort] = useState("date-asc");
+  const [doneSort, setDoneSort] = useState("date-desc");
+  const [allSort, setAllSort] = useState("date-desc");
+  const [tab, setTab] = useState("all");
+
+  // Add Camp Modal
+  const [showAddCampModal, setShowAddCampModal] = useState(false);
+
+  // --- Enquiries States ---
+  const [enquiries, setEnquiries] = useState([]);
+  const [loadingEnquiries, setLoadingEnquiries] = useState(false);
+  const [enquiriesTab, setEnquiriesTab] = useState("pending");
+  const [enquiryQuery, setEnquiryQuery] = useState("");
+  const [passwordById, setPasswordById] = useState({});
+  const [rejectReasonById, setRejectReasonById] = useState({});
+  const [resetEnquiryModal, setResetEnquiryModal] = useState(null);
+  const [newEnquiryPassword, setNewEnquiryPassword] = useState("");
+  const [editingEnquiry, setEditingEnquiry] = useState(null);
+  const [editEnquiryForm, setEditEnquiryForm] = useState({});
+
+  // --- Organizers Page States ---
+  const [editOrganizerId, setEditOrganizerId] = useState(null);
+  const [editOrganizerForm, setEditOrganizerForm] = useState({});
+
+  // --- UI/UX Customizer States ---
+  const [homeBgType, setHomeBgType] = useState(() => localStorage.getItem("homeBgType") || "gradient");
+  const [homeBgUrl, setHomeBgUrl] = useState(() => localStorage.getItem("homeBgUrl") || "");
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    setUploading(true);
+    try {
+      const response = await fetch("/api/admin/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.success) {
+        setHomeBgUrl(data.fileUrl);
+        alert("🎉 File uploaded successfully! Click 'Save Theme Settings' to apply.");
+      } else {
+        alert("Upload failed: " + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error uploading file. Make sure backend is running.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleSaveUIUX = async () => {
+    try {
+      localStorage.setItem("homeBgType", homeBgType);
+      localStorage.setItem("homeBgUrl", homeBgUrl);
+
+      const response = await fetch("/api/admin/theme", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bgType: homeBgType, bgUrl: homeBgUrl }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        alert("🎉 UI/UX background updated successfully on server! Visit the Home page to see the changes.");
+      } else {
+        alert("Saved to local storage, but server database save failed.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Saved to local storage, but server connection failed.");
+    }
+  };
+
+  const fetchThemeSettings = async () => {
+    try {
+      const response = await fetch("/api/admin/theme");
+      const data = await response.json();
+      if (data) {
+        setHomeBgType(data.bgType || "gradient");
+        setHomeBgUrl(data.bgUrl || "");
+      }
+    } catch (err) {
+      console.error("Failed to load server theme settings:", err);
+    }
+  };
+
+  const navigate = useNavigate();
+  const token = localStorage.getItem("admin-token");
+
+  useEffect(() => {
+    if (!token) {
+      navigate("/admin-login");
+      return;
+    }
+    fetchCamps();
+    fetchOrganizersList();
+    fetchEnquiries();
+    fetchThemeSettings();
+    fetchBloodRequests();
+  }, []);
+
+  const fetchBloodRequests = async () => {
+    setLoadingBloodRequests(true);
+    try {
+      const data = await adminService.getBloodRequests();
+      setBloodRequests(data || []);
+    } catch (err) {
+      console.error("Failed to load blood requests", err);
+    } finally {
+      setLoadingBloodRequests(false);
+    }
+  };
+
+  // --- Organizers Methods ---
+  const fetchOrganizersList = async () => {
+    setLoadingOrganizers(true);
+    try {
+      const data = await adminService.getOrganizers();
+      setOrganizersList(data || []);
+    } catch (err) {
+      console.error("Failed to load organizers", err);
+    } finally {
+      setLoadingOrganizers(false);
+    }
+  };
+
+  const handleOrganizerSelect = (e) => {
+    const selectedId = e.target.value;
+    if (!selectedId) {
+      setNewCamp({
+        ...newCamp,
+        organizerId: "",
+        organizerName: "",
+        organizerContact: "",
+      });
+      return;
+    }
+
+    const org = organizersList.find((o) => o._id === selectedId);
+    if (org) {
+      setNewCamp({
+        ...newCamp,
+        organizerId: org._id,
+        organizerName: org.name,
+        organizerContact: org.phone,
+      });
+    }
+  };
+
+  const handleEditOrganizerClick = (org) => {
+    setEditOrganizerId(org._id);
+    setEditOrganizerForm({
+      name: org.name,
+      phone: org.phone,
+      isActive: org.isActive,
+    });
+  };
+
+  const handleOrganizerFormChange = (e) => {
+    const value = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+    setEditOrganizerForm({ ...editOrganizerForm, [e.target.name]: value });
+  };
+
+  const handleSaveOrganizer = async (id) => {
+    try {
+      await adminService.updateOrganizer(id, editOrganizerForm);
+      setOrganizersList((prev) =>
+        prev.map((org) => (org._id === id ? { ...org, ...editOrganizerForm } : org))
+      );
+      setEditOrganizerId(null);
+      alert("✅ Organizer updated successfully!");
+    } catch (err) {
+      alert("Error updating organizer");
+    }
+  };
+
+  const handleDeleteOrganizer = async (id) => {
+    if (!window.confirm("Are you sure? This action cannot be undone.")) return;
+    try {
+      await adminService.deleteOrganizer(id);
+      setOrganizersList((prev) => prev.filter((org) => org._id !== id));
+      alert("✅ Deleted successfully!");
+    } catch (err) {
+      alert("Error deleting organizer");
+    }
+  };
+
+  // --- Enquiries Methods ---
+  const fetchEnquiries = async () => {
+    setLoadingEnquiries(true);
+    try {
+      const data = await adminService.getEnquiries();
+      setEnquiries(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load enquiries", err);
+    } finally {
+      setLoadingEnquiries(false);
+    }
+  };
+
+  const handleDeleteEnquiry = async (id) => {
+    if (!window.confirm("Permanently delete this enquiry?")) return;
+    try {
+      await adminService.deleteEnquiry(id);
+      setEnquiries((prev) => prev.filter((e) => e._id !== id));
+      alert("✅ Deleted successfully");
+    } catch (err) {
+      alert("Failed to delete");
+    }
+  };
+
+  const openEditEnquiryModal = (enquiry) => {
+    setEditingEnquiry(enquiry);
+    setEditEnquiryForm({
+      organizerName: enquiry.organizerName,
+      email: enquiry.email,
+      phone: enquiry.phone,
+      campName: enquiry.campName,
+      campDate: enquiry.campDate ? enquiry.campDate.split("T")[0] : "",
+      campLocation: enquiry.campLocation,
+      hospitalName: enquiry.hospitalName,
+      message: enquiry.message,
+    });
+  };
+
+  const handleEditEnquiryChange = (e) => {
+    setEditEnquiryForm({ ...editEnquiryForm, [e.target.name]: e.target.value });
+  };
+
+  const saveEditEnquiry = async () => {
+    try {
+      const data = await adminService.updateEnquiry(editingEnquiry._id, editEnquiryForm);
+      setEnquiries((prev) =>
+        prev.map((e) => (e._id === editingEnquiry._id ? data.enquiry : e))
+      );
+      setEditingEnquiry(null);
+      alert("✅ Enquiry Details Updated!");
+    } catch (err) {
+      alert("Failed to update enquiry");
+    }
+  };
+
+  const approveEnquiry = async (enquiryId) => {
+    const pw = (passwordById[enquiryId] || "").trim();
+    if (!window.confirm("Approve this enquiry?")) return;
+
+    try {
+      const data = await adminService.approveEnquiry(enquiryId, pw);
+      if (data.type === "existing_user") {
+        alert("✅ Approved (Existing User).\nCamp assigned.\nUser logs in with OLD password.");
+      } else {
+        alert(`✅ Approved (New User).\nEmail: ${data.organizerLogin.email}\nPassword: ${data.organizerLogin.password}`);
+      }
+      fetchEnquiries();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Approve failed");
+    }
+  };
+
+  const resetEnquiryPassword = async () => {
+    if (!newEnquiryPassword.trim()) {
+      alert("Please enter new password");
+      return;
+    }
+
+    try {
+      await adminService.resetOrganizerPassword(resetEnquiryModal._id, newEnquiryPassword);
+      alert("✅ Password updated successfully");
+      setResetEnquiryModal(null);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to update password");
+    }
+  };
+
+  const rejectEnquiry = async (enquiryId) => {
+    const reason = (rejectReasonById[enquiryId] || "").trim();
+    if (!reason) return alert("Please enter rejection reason");
+    if (!window.confirm("Reject this enquiry?")) return;
+
+    try {
+      await adminService.rejectEnquiry(enquiryId, reason);
+      alert("✅ Rejected");
+      fetchEnquiries();
+    } catch (err) {
+      alert("Reject failed");
+    }
+  };
+
+  const filteredEnquiries = useMemo(() => {
+    let data = [...enquiries];
+    if (enquiriesTab !== "all") data = data.filter((e) => e.status === enquiriesTab);
+    const query = enquiryQuery.trim().toLowerCase();
+    if (query) {
+      data = data.filter((e) =>
+        [e.organizerName, e.email, e.phone, e.campName, e.hospitalName]
+          .join(" ")
+          .toLowerCase()
+          .includes(query)
+      );
+    }
+    return data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }, [enquiries, enquiriesTab, enquiryQuery]);
+
+  // --- Camps & Donors Logic ---
+  useEffect(() => {
+    if (selectedCamp) fetchDonors();
+  }, [selectedCamp]);
+
+  const fetchCamps = async () => {
+    setLoadingCamps(true);
+    try {
+      const data = await campService.getCampsWithCount();
+      const campsData = data || [];
+      setCamps(campsData);
+      if (campsData.length > 0 && !selectedCamp) {
+        setSelectedCamp(campsData[0]._id);
+      }
+    } catch (err) {
+      console.error("Failed to fetch camps:", err.response || err);
+      setCamps([]);
+      if ([401, 403].includes(err.response?.status)) handleLogout();
+    } finally {
+      setLoadingCamps(false);
+    }
+  };
+
+  const fetchDonors = async () => {
+    if (!selectedCamp) return;
+    setLoadingDonors(true);
+    try {
+      const data = await donorService.getDonorsByCamp(selectedCamp);
+      setDonors(data || []);
+    } catch (err) {
+      console.error("Failed to fetch donors:", err.response || err);
+      setDonors([]);
+      if ([401, 403].includes(err.response?.status)) handleLogout();
+    } finally {
+      setLoadingDonors(false);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("admin-token");
+    navigate("/admin-login");
+  };
+
+  const handleNewCampChange = (e) => {
+    setNewCamp({ ...newCamp, [e.target.name]: e.target.value });
+  };
+
+  const handleNewCampSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await campService.createCamp(newCamp);
+      setNewCamp({
+        name: "",
+        location: "",
+        date: "",
+        organizerName: "",
+        organizerContact: "",
+        proName: "",
+        hospitalName: "",
+      });
+      fetchCamps();
+      setShowAddCampModal(false);
+      alert("Camp added successfully!");
+    } catch (err) {
+      console.error(err.response || err);
+      alert(err?.response?.data?.message || "Error adding camp.");
+    }
+  };
+
+  const handleEditCampClick = (camp) => {
+    setEditCampId(camp._id);
+    setEditCampForm({
+      name: camp.name || "",
+      location: camp.location || "",
+      date: camp.date ? camp.date.slice(0, 10) : "",
+      organizerName: camp.organizerName || "",
+      organizerContact: camp.organizerContact || "",
+      proName: camp.proName || "",
+      hospitalName: camp.hospitalName || "",
+    });
+  };
+
+  const handleEditCampChange = (e) => {
+    setEditCampForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleEditCampSave = async (id) => {
+    try {
+      await campService.updateCamp(id, editCampForm);
+      setEditCampId(null);
+      await fetchCamps();
+      alert("✅ Camp updated successfully!");
+    } catch (err) {
+      console.error(err.response || err);
+      alert(err?.response?.data?.message || "Error updating camp");
+    }
+  };
+
+  const handleDeleteCamp = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this camp?")) return;
+    try {
+      await campService.deleteCamp(id);
+      if (selectedCamp === id) {
+        setSelectedCamp(null);
+        setDonors([]);
+      }
+      await fetchCamps();
+      alert("✅ Camp deleted successfully!");
+    } catch (err) {
+      console.error(err.response || err);
+      alert(err?.response?.data?.message || "Error deleting camp");
+    }
+  };
+
+  const handleDeleteDonor = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this donor?")) return;
+    try {
+      await donorService.deleteDonor(id);
+      await fetchDonors();
+      await fetchCamps();
+      alert("Donor deleted successfully!");
+    } catch (err) {
+      console.error(err.response || err);
+      alert(err?.response?.data?.message || "Error deleting donor");
+    }
+  };
+
+  const handleEditClick = (donor) => {
+    setEditDonorId(donor._id);
+    setEditForm({ ...donor });
+  };
+
+  const handleEditChange = (e) => {
+    setEditForm({ ...editForm, [e.target.name]: e.target.value });
+  };
+
+  const handleEditSave = async (id) => {
+    try {
+      await donorService.updateDonor(id, editForm);
+      setDonors((prev) =>
+        prev.map((d) => (d._id === id ? { ...editForm } : d))
+      );
+      setEditDonorId(null);
+    } catch (err) {
+      console.error(err.response || err);
+      alert(err?.response?.data?.message || "Error saving donor update");
+    }
+  };
+
+  const downloadPDF = () => {
+    if (!donors.length) return alert("No donors to export.");
+    const doc = new jsPDF();
+
+    const camp = camps.find((c) => c._id === selectedCamp);
+    const campName = camp?.name || "All Camps";
+
+    doc.setFontSize(16);
+    doc.text(`Donor List for Camp: ${campName}`, 14, 15);
+
+    let startY = 22;
+    doc.setFontSize(11);
+
+    if (camp) {
+      const campLines = [
+        `Date: ${camp.date ? new Date(camp.date).toLocaleDateString() : "N/A"}`,
+        `Location: ${camp.location || "N/A"}`,
+        `Organizer: ${camp.organizerName || "N/A"} (${
+          camp.organizerContact || "N/A"
+        })`,
+        `PRO: ${camp.proName || "N/A"}`,
+        `Hospital: ${camp.hospitalName || "N/A"}`,
+        `Camp ID: ${camp._id}`,
+      ];
+      campLines.forEach((line, i) => doc.text(line, 14, startY + i * 6));
+      startY += campLines.length * 6 + 4;
+    } else {
+      doc.text("Camps: All", 14, startY);
+      startY += 10;
+    }
+
+    const tableColumn = [
+      "#",
+      "Name",
+      "Blood Group",
+      "Age",
+      "Weight (kg)",
+      "Email",
+      "Phone",
+      "Address",
+      "Remark",
+    ];
+
+    const tableRows = donors.map((donor, index) => [
+      index + 1,
+      donor.name ?? "",
+      donor.bloodGroup ?? "",
+      donor.age ?? "",
+      donor.weight ?? "",
+      donor.email ?? "",
+      donor.phone ?? "",
+      donor.address ?? "",
+      donor.remark ?? "",
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY,
+      styles: { fontSize: 9 },
+    });
+
+    doc.save(`DonorList_${campName}.pdf`);
+  };
+
+  const totalDonorsAcrossCamps = useMemo(() => {
+    return camps.reduce(
+      (sum, c) => sum + (typeof c.donorCount === "number" ? c.donorCount : 0),
+      0
+    );
+  }, [camps]);
+
+  const totalDonations = useMemo(() => {
+    return donors.filter(d => d.remark === "Donated").length;
+  }, [donors]);
+
+  const bloodGroupStats = useMemo(() => {
+    const counts = { "O+": 0, "A+": 0, "B+": 0, "AB+": 0, "O-": 0, "Others": 0 };
+    let total = 0;
+    donors.forEach((d) => {
+      const bg = d.bloodGroup;
+      if (counts[bg] !== undefined) {
+        counts[bg]++;
+        total++;
+      } else if (bg) {
+        counts["Others"]++;
+        total++;
+      }
+    });
+
+    const list = Object.keys(counts).map((key, index) => {
+      const count = counts[key];
+      const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+      const colors = ["#ff2e4b", "#ef4444", "#3b82f6", "#8b5cf6", "#f59e0b", "#6b7280"];
+      return {
+        label: key,
+        count,
+        percentage: pct,
+        color: colors[index],
+      };
+    });
+
+    return { list, total };
+  }, [donors]);
+
+  // Sorting and Filtering for Camps
+  const applySearch = (list) => {
+    const q = campQuery.trim().toLowerCase();
+    if (!q) return list;
+    return list.filter((c) => {
+      const s = [
+        c?.name,
+        c?.location,
+        c?.hospitalName,
+        c?.organizerName,
+        c?.organizerContact,
+        c?.proName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return s.includes(q);
+    });
+  };
+
+  const upcomingCamps = useMemo(() => {
+    let list = camps.filter((c) => isUpcoming(toDate(c?.date)));
+    if (onlyComingSoon) list = list.filter((c) => isSoon(toDate(c?.date), 7));
+    list = applySearch(list);
+    list.sort((a, b) => {
+      const da = a?.date ? new Date(a.date).getTime() : 0;
+      const db = b?.date ? new Date(b.date).getTime() : 0;
+      return upcomingSort === "date-asc" ? da - db : db - da;
+    });
+    return list;
+  }, [camps, onlyComingSoon, campQuery, upcomingSort]);
+
+  const doneCamps = useMemo(() => {
+    let list = camps.filter((c) => !isUpcoming(toDate(c?.date)));
+    list = applySearch(list);
+    list.sort((a, b) => {
+      const da = a?.date ? new Date(a.date).getTime() : 0;
+      const db = b?.date ? new Date(b.date).getTime() : 0;
+      return doneSort === "date-desc" ? db - da : da - db;
+    });
+    return list;
+  }, [camps, campQuery, doneSort]);
+
+  const allCampsList = useMemo(() => {
+    let list = applySearch([...camps]);
+    list.sort((a, b) => {
+      const da = a?.date ? new Date(a.date).getTime() : 0;
+      const db = b?.date ? new Date(b.date).getTime() : 0;
+      return allSort === "date-desc" ? db - da : da - db;
+    });
+    return list;
+  }, [camps, campQuery, allSort]);
+
+  const whenBadge = (date) => {
+    const d = toDate(date);
+    if (!d) return null;
+    const du = daysUntil(d);
+    const whenLabel =
+      du < 0
+        ? "Done"
+        : du === 0
+        ? "Today"
+        : du === 1
+        ? "Tomorrow"
+        : `In ${du} days`;
+    const cls =
+      du < 0
+        ? "bg-secondary"
+        : du <= 3
+        ? "bg-warning text-dark"
+        : "bg-light text-dark";
+    return <span className={`badge ${cls}`}>{whenLabel}</span>;
+  };
+
+  const renderDonutChart = () => {
+    let currentOffset = 0;
+    const radius = 50;
+    const circumference = 2 * Math.PI * radius;
+
+    return (
+      <svg viewBox="0 0 140 140" className="donut-svg">
+        <circle cx="70" cy="70" r={radius} fill="transparent" stroke="rgba(255,255,255,0.03)" strokeWidth="12" />
+        {bloodGroupStats.list.map((bg) => {
+          if (bg.percentage === 0) return null;
+          const strokeLength = (bg.percentage / 100) * circumference;
+          const strokeOffset = circumference - strokeLength + currentOffset;
+          currentOffset -= strokeLength;
+
+          return (
+            <circle
+              key={bg.label}
+              cx="70"
+              cy="70"
+              r={radius}
+              fill="transparent"
+              stroke={bg.color}
+              strokeWidth="12"
+              strokeDasharray={circumference}
+              strokeDashoffset={strokeOffset}
+              strokeLinecap="round"
+            />
+          );
+        })}
+        <text x="70" y="68" textAnchor="middle" className="donut-center-text">
+          {bloodGroupStats.total}
+        </text>
+        <text x="70" y="84" textAnchor="middle" className="donut-center-subtext">
+          Total
+        </text>
+      </svg>
+    );
+  };
+
+  return (
+    <div className="dashboard-wrapper">
+      <style>{`
+        /* Local Premium Styles for Admin Panel */
+        .dashboard-wrapper {
+          display: flex;
+          min-height: 100vh;
+          background-color: #f8fafc;
+          font-family: 'Inter', sans-serif;
+        }
+        .sidebar {
+          width: 260px;
+          background-color: #0f172a;
+          color: #f8fafc;
+          display: flex;
+          flex-direction: column;
+          padding: 1.5rem 1rem;
+          flex-shrink: 0;
+          border-right: 1px solid #1e293b;
+          box-shadow: 4px 0 25px rgba(0, 0, 0, 0.08);
+        }
+        .brand-container {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          margin-bottom: 2rem;
+          padding: 0 0.5rem;
+        }
+        .brand-logo {
+          font-size: 2rem;
+          animation: pulse-heart 2.5s infinite;
+        }
+        .brand-name {
+          font-size: 1.25rem;
+          font-weight: 800;
+          color: #ffffff;
+          letter-spacing: 0.05em;
+          font-family: 'Cinzel', serif;
+        }
+        .brand-name span {
+          color: #e11d48;
+        }
+        .brand-subtitle {
+          font-size: 0.75rem;
+          color: #94a3b8;
+          font-weight: 500;
+        }
+        .menu-section {
+          margin-bottom: 1.5rem;
+        }
+        .menu-section-title {
+          padding: 0 0.75rem;
+          font-size: 0.7rem;
+          font-weight: 700;
+          text-transform: uppercase;
+          color: #64748b;
+          letter-spacing: 0.1em;
+          margin-bottom: 0.5rem;
+        }
+        .menu-item {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.65rem 0.75rem;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          font-weight: 600;
+          color: #cbd5e1;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          text-align: left;
+          transition: all 0.2s ease-in-out;
+        }
+        .menu-item:hover {
+          background-color: #1e293b;
+          color: #ffffff;
+        }
+        .menu-item.active {
+          background-color: #e11d48;
+          color: #ffffff;
+          box-shadow: 0 4px 12px rgba(225, 29, 72, 0.35);
+        }
+        .menu-item-icon {
+          font-size: 1.1rem;
+        }
+        .emergency-button-container {
+          margin-top: auto;
+          padding-top: 1rem;
+        }
+        .emergency-btn {
+          width: 100%;
+          padding: 0.75rem;
+          background-color: #ef4444;
+          color: white;
+          font-weight: 700;
+          font-size: 0.85rem;
+          border: none;
+          border-radius: 0.5rem;
+          cursor: pointer;
+          box-shadow: 0 4px 10px rgba(239, 68, 68, 0.3);
+          transition: all 0.2s ease;
+        }
+        .emergency-btn:hover {
+          background-color: #dc2626;
+          transform: translateY(-2px);
+        }
+        .main-content {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          min-height: 100vh;
+          overflow-x: hidden;
+        }
+        .top-header {
+          height: 70px;
+          background-color: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0 2rem;
+          position: sticky;
+          top: 0;
+          z-index: 10;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+        .search-container {
+          display: flex;
+          align-items: center;
+          background-color: #f1f5f9;
+          border: 1px solid #e2e8f0;
+          border-radius: 9999px;
+          padding: 0.5rem 1rem;
+          width: 320px;
+          transition: all 0.2s ease;
+        }
+        .search-container:focus-within {
+          border-color: #cbd5e1;
+          background-color: #ffffff;
+          box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.1);
+        }
+        .search-icon {
+          margin-right: 0.5rem;
+          color: #94a3b8;
+        }
+        .search-input {
+          background: transparent;
+          border: none;
+          outline: none;
+          width: 100%;
+          font-size: 0.85rem;
+          color: #334155;
+        }
+        .header-actions {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+        }
+        .icon-badge-btn {
+          position: relative;
+          font-size: 1.25rem;
+          color: #64748b;
+          cursor: pointer;
+          transition: color 0.2s;
+          background: #f8fafc;
+          padding: 0.4rem;
+          border-radius: 50%;
+          border: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .icon-badge-btn:hover {
+          color: #e11d48;
+          background: #fff1f2;
+        }
+        .badge-count {
+          position: absolute;
+          top: -4px;
+          right: -4px;
+          background-color: #e11d48;
+          color: white;
+          font-size: 0.65rem;
+          font-weight: 700;
+          min-width: 16px;
+          height: 16px;
+          border-radius: 9999px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 4px;
+          border: 2px solid white;
+        }
+        .user-profile-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding-left: 1.5rem;
+          border-left: 1px solid #e2e8f0;
+        }
+        .user-avatar {
+          width: 38px;
+          height: 38px;
+          border-radius: 9999px;
+          background-color: #f1f5f9;
+          border: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.2rem;
+        }
+        .user-info {
+          display: flex;
+          flex-direction: column;
+        }
+        .user-name {
+          font-size: 0.875rem;
+          font-weight: 700;
+          color: #1e293b;
+        }
+        .user-role {
+          font-size: 0.7rem;
+          color: #64748b;
+          font-weight: 500;
+        }
+        .welcome-container {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 2rem;
+          background-color: #ffffff;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .welcome-title {
+          font-size: 1.75rem;
+          font-weight: 800;
+          color: #0f172a;
+          margin-bottom: 0.25rem;
+          font-family: 'Cinzel', serif;
+        }
+        .welcome-subtitle {
+          font-size: 0.875rem;
+          color: #64748b;
+        }
+        .date-picker-badge {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          background-color: #f8fafc;
+          border: 1px solid #e2e8f0;
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: #334155;
+        }
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+          gap: 1.5rem;
+          padding: 2rem;
+        }
+        .stat-card {
+          background-color: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 1rem;
+          padding: 1.5rem;
+          display: flex;
+          align-items: center;
+          gap: 1.25rem;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .stat-card:hover {
+          transform: translateY(-4px);
+          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+        }
+        .stat-icon-container {
+          width: 48px;
+          height: 48px;
+          border-radius: 0.75rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 1.5rem;
+        }
+        .stat-icon-container.users { background-color: #eff6ff; color: #3b82f6; }
+        .stat-icon-container.donations { background-color: #fff1f2; color: #f43f5e; }
+        .stat-icon-container.requests { background-color: #fef2f2; color: #ef4444; }
+        .stat-icon-container.camps { background-color: #f0fdf4; color: #22c55e; }
+        .stat-details {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+        }
+        .stat-label {
+          font-size: 0.75rem;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          color: #64748b;
+          margin-bottom: 0.25rem;
+        }
+        .stat-value {
+          font-size: 1.5rem;
+          font-weight: 800;
+          color: #0f172a;
+          line-height: 1;
+          margin-bottom: 0.25rem;
+        }
+        .stat-trend {
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+        .stat-trend.up { color: #16a34a; }
+        .stat-trend.down { color: #dc2626; }
+        .charts-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+          gap: 1.5rem;
+          padding: 0 2rem 2rem;
+        }
+        .chart-card {
+          background-color: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 1rem;
+          padding: 1.5rem;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .chart-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1.5rem;
+        }
+        .chart-title {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .chart-select {
+          padding: 0.4rem 0.75rem;
+          border-radius: 0.5rem;
+          border: 1px solid #e2e8f0;
+          font-size: 0.8rem;
+          color: #475569;
+          outline: none;
+          background-color: #f8fafc;
+        }
+        .line-chart-container {
+          height: 180px;
+          position: relative;
+        }
+        .chart-grid-line {
+          position: absolute;
+          left: 0; right: 0;
+          border-top: 1px dashed #e2e8f0;
+        }
+        .chart-axis-label {
+          font-size: 0.7rem;
+          color: #94a3b8;
+          font-weight: 500;
+        }
+        .pie-chart-wrapper {
+          display: flex;
+          align-items: center;
+          gap: 2rem;
+        }
+        .pie-legend {
+          flex: 1;
+          display: flex;
+          flex-direction: column;
+          gap: 0.5rem;
+        }
+        .legend-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          font-size: 0.8rem;
+        }
+        .legend-left {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+        .legend-color {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+        }
+        .legend-label {
+          color: #475569;
+          font-weight: 600;
+        }
+        .legend-value {
+          color: #64748b;
+        }
+        .dashboard-details-grid {
+          padding: 0 2rem 2rem;
+        }
+        .table-card {
+          background-color: #ffffff;
+          border: 1px solid #e2e8f0;
+          border-radius: 1rem;
+          padding: 1.5rem;
+          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .table-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: 1.5rem;
+        }
+        .table-title {
+          font-size: 1rem;
+          font-weight: 700;
+          color: #0f172a;
+        }
+        .view-all-link {
+          color: #e11d48;
+          font-size: 0.8rem;
+          font-weight: 700;
+          background: transparent;
+          border: none;
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+        .view-all-link:hover {
+          color: #be123c;
+        }
+        .custom-table-container {
+          overflow-x: auto;
+        }
+        .premium-table {
+          width: 100%;
+          border-collapse: collapse;
+          text-align: left;
+        }
+        .premium-table th {
+          padding: 0.75rem 1rem;
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          border-bottom: 2px solid #f1f5f9;
+        }
+        .premium-table td {
+          padding: 1rem;
+          font-size: 0.85rem;
+          color: #334155;
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .premium-table tbody tr:hover {
+          background-color: #f8fafc;
+        }
+        .donor-table-id {
+          font-family: monospace;
+          font-weight: 600;
+          color: #64748b;
+        }
+      `}</style>
+      {/* 1. Left Sidebar Navigation */}
+      <aside className="sidebar">
+        <div className="brand-container">
+          <div className="brand-logo">🩸</div>
+          <div>
+            <div className="brand-name">Life<span>Drop</span></div>
+            <div className="brand-subtitle">Admin Panel</div>
+          </div>
+        </div>
+
+        <div className="menu-section">
+          <div className="menu-section-title">Main</div>
+          <button
+            className={`menu-item ${currentView === "dashboard" ? "active" : ""}`}
+            onClick={() => setCurrentView("dashboard")}
+          >
+            <span className="menu-item-icon">📊</span> Dashboard
+          </button>
+        </div>
+
+        <div className="menu-section">
+          <div className="menu-section-title">Management</div>
+          <button
+            className={`menu-item ${currentView === "camps" ? "active" : ""}`}
+            onClick={() => setCurrentView("camps")}
+          >
+            <span className="menu-item-icon">⛺</span> Camps
+          </button>
+          <button
+            className={`menu-item ${currentView === "users" ? "active" : ""}`}
+            onClick={() => setCurrentView("users")}
+          >
+            <span className="menu-item-icon">👥</span> Donors (Users)
+          </button>
+          <button
+            className={`menu-item ${currentView === "enquiries" ? "active" : ""}`}
+            onClick={() => setCurrentView("enquiries")}
+          >
+            <span className="menu-item-icon">📋</span> Enquiries
+          </button>
+          <button
+            className={`menu-item ${currentView === "blood-requests" ? "active" : ""}`}
+            onClick={() => setCurrentView("blood-requests")}
+          >
+            <span className="menu-item-icon">🩸</span> Blood Requests
+          </button>
+          <button
+            className={`menu-item ${currentView === "organizers" ? "active" : ""}`}
+            onClick={() => setCurrentView("organizers")}
+          >
+            <span className="menu-item-icon">🤝</span> Organizers
+          </button>
+        </div>
+
+        <div className="menu-section">
+          <div className="menu-section-title">Design</div>
+          <button
+            className={`menu-item ${currentView === "uiux" ? "active" : ""}`}
+            onClick={() => setCurrentView("uiux")}
+          >
+            <span className="menu-item-icon">🎨</span> UI/UX
+          </button>
+          <button
+            className={`menu-item ${currentView === "impact-gallery" ? "active" : ""}`}
+            onClick={() => setCurrentView("impact-gallery")}
+          >
+            <span className="menu-item-icon">🖼️</span> Impact Gallery
+          </button>
+          <button
+            className={`menu-item ${currentView === "success-stories" ? "active" : ""}`}
+            onClick={() => setCurrentView("success-stories")}
+          >
+            <span className="menu-item-icon">🌟</span> Success Stories
+          </button>
+        </div>
+
+        <div className="menu-section">
+          <div className="menu-section-title">Content Management</div>
+          <button
+            className={`menu-item ${currentView === "news" ? "active" : ""}`}
+            onClick={() => setCurrentView("news")}
+          >
+            <span className="menu-item-icon">📰</span> News & Awareness
+          </button>
+        </div>
+
+        <div className="menu-section">
+          <div className="menu-section-title">Settings</div>
+          <button className="menu-item" onClick={handleLogout}>
+            <span className="menu-item-icon">🚪</span> Logout
+          </button>
+        </div>
+
+        <div className="emergency-button-container">
+          <button className="emergency-btn">🚨 Emergency Requests</button>
+        </div>
+      </aside>
+
+      {/* 2. Main Content Area */}
+      <main className="main-content">
+        {/* Top Header Bar */}
+        <header className="top-header">
+          <div className="search-container">
+            <span className="search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="Search anything here..."
+              className="search-input"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="header-actions">
+            <div className="icon-badge-btn" title="Messages">
+              <span>✉️</span>
+              <span className="badge-count">5</span>
+            </div>
+            <div className="icon-badge-btn" title="Notifications">
+              <span>🔔</span>
+              <span className="badge-count">8</span>
+            </div>
+            <div className="user-profile-badge">
+              <div className="user-avatar">👤</div>
+              <div className="user-info">
+                <span className="user-name">Admin</span>
+                <span className="user-role">Super Admin</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* --- 1. Dashboard Tab View --- */}
+        {currentView === "dashboard" && (
+          <>
+            <div className="welcome-container">
+              <div>
+                <h1 className="welcome-title">Welcome back, Admin!</h1>
+                <p className="welcome-subtitle">Here's what's happening with LifeDrop today.</p>
+              </div>
+              <div className="date-picker-badge">
+                <span>📅</span> May 30, 2026
+              </div>
+            </div>
+
+            <div className="stats-grid">
+              <div className="stat-card">
+                <div className="stat-icon-container users">👥</div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Users</span>
+                  <span className="stat-value">{totalDonorsAcrossCamps}</span>
+                  <span className="stat-trend up">▲ 12.5%</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon-container donations">🩸</div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Donations</span>
+                  <span className="stat-value">{totalDonations}</span>
+                  <span className="stat-trend up">▲ 8.7%</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon-container requests">❤️</div>
+                <div className="stat-details">
+                  <span className="stat-label">Blood Requests</span>
+                  <span className="stat-value">{donors.length}</span>
+                  <span className="stat-trend down">▼ 3.2%</span>
+                </div>
+              </div>
+
+              <div className="stat-card">
+                <div className="stat-icon-container camps">⛺</div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Camps</span>
+                  <span className="stat-value">{camps.length}</span>
+                  <span className="stat-trend up">▲ 6.1%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="charts-grid">
+              <div className="chart-card">
+                <div className="chart-header">
+                  <h3 className="chart-title">Donations Overview</h3>
+                  <select className="chart-select">
+                    <option>This Week</option>
+                  </select>
+                </div>
+                <div className="line-chart-container">
+                  <div className="chart-grid-line" style={{ bottom: "25%" }} />
+                  <div className="chart-grid-line" style={{ bottom: "50%" }} />
+                  <div className="chart-grid-line" style={{ bottom: "75%" }} />
+                  
+                  <svg viewBox="0 0 500 150" style={{ width: "100%", height: "100%", overflow: "visible" }}>
+                    <path
+                      d="M 10 120 Q 80 50 160 100 T 320 30 T 480 90"
+                      fill="none"
+                      stroke="#ff2e4b"
+                      strokeWidth="3.5"
+                      strokeLinecap="round"
+                    />
+                    <circle cx="160" cy="100" r="5" fill="#ff2e4b" filter="drop-shadow(0 0 3px #ff2e4b)" />
+                    <circle cx="320" cy="30" r="5" fill="#ff2e4b" filter="drop-shadow(0 0 3px #ff2e4b)" />
+                  </svg>
+                </div>
+                <div className="d-flex justify-content-between mt-2 px-2">
+                  <span className="chart-axis-label">May 25</span>
+                  <span className="chart-axis-label">May 26</span>
+                  <span className="chart-axis-label">May 27</span>
+                  <span className="chart-axis-label">May 28</span>
+                  <span className="chart-axis-label">May 29</span>
+                  <span className="chart-axis-label">May 30</span>
+                  <span className="chart-axis-label">May 31</span>
+                </div>
+              </div>
+
+              <div className="chart-card">
+                <div className="chart-header">
+                  <h3 className="chart-title">Blood Group Distribution</h3>
+                </div>
+                <div className="pie-chart-wrapper">
+                  {renderDonutChart()}
+                  <div className="pie-legend">
+                    {bloodGroupStats.list.slice(0, 5).map((bg) => (
+                      <div className="legend-item" key={bg.label}>
+                        <div className="legend-left">
+                          <span className="legend-color" style={{ backgroundColor: bg.color }} />
+                          <span className="legend-label">{bg.label}</span>
+                        </div>
+                        <span className="legend-value">{bg.percentage}% ({bg.count})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="dashboard-details-grid">
+              <div className="table-card">
+                <div className="table-header">
+                  <h3 className="table-title">Live Blood Requests (Last 24 Hours)</h3>
+                  <button className="view-all-link" onClick={() => setCurrentView("dashboard")}>View All</button>
+                </div>
+                
+                <div className="custom-table-container">
+                  {loadingBloodRequests ? (
+                    <p className="text-center py-4 text-muted">Loading...</p>
+                  ) : (() => {
+                      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+                      const recentBloodRequests = bloodRequests
+                        .filter((req) => new Date(req.createdAt) >= twentyFourHoursAgo)
+                        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+                        .slice(0, 5);
+                      
+                      if (recentBloodRequests.length === 0) {
+                        return <p className="text-center py-4 text-muted">No blood requests in the last 24 hours.</p>;
+                      }
+                      
+                      return (
+                        <table className="premium-table">
+                          <thead>
+                            <tr>
+                              <th>ID</th>
+                              <th>Patient Name</th>
+                              <th>Blood Group</th>
+                              <th>Hospital / City</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {recentBloodRequests.map((req) => (
+                              <tr key={req._id}>
+                                <td className="donor-table-id">{req.requestId || `#REQ-${req._id.slice(-4).toUpperCase()}`}</td>
+                                <td>{req.patientName}</td>
+                                <td>
+                                  <span className="donor-table-group">{req.bloodGroup}</span>
+                                </td>
+                                <td>{req.hospital} {req.city ? `(${req.city})` : ''}</td>
+                                <td>
+                                  <span className={`status-badge ${req.status === "fulfilled" ? "fulfilled" : req.status === "closed" ? "urgent" : "pending"}`}>
+                                    {req.status || "Pending"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                  })()}
+                </div>
+              </div>
+
+              <div className="d-flex flex-column gap-4">
+                <div className="activity-card">
+                  <h3 className="chart-title mb-4">Recent Activity</h3>
+                  <div className="activity-timeline">
+                    <div className="activity-item">
+                      <div className="activity-icon-wrap user">👤</div>
+                      <div className="activity-details">
+                        <span className="activity-title">New donor registered</span>
+                        <span className="activity-desc">Ravi Kumar signed up.</span>
+                        <span className="activity-time">10 mins ago</span>
+                      </div>
+                    </div>
+                    <div className="activity-item">
+                      <div className="activity-icon-wrap camp">⛺</div>
+                      <div className="activity-details">
+                        <span className="activity-title">New camp added</span>
+                        <span className="activity-desc">City Hospital Blood Camp.</span>
+                        <span className="activity-time">1 hour ago</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="quick-actions-card">
+                  <h3 className="chart-title mb-4">Quick Actions</h3>
+                  <div className="actions-grid">
+                    <div className="action-box" onClick={() => setShowAddCampModal(true)}>
+                      <span className="action-box-icon">⛺</span>
+                      <span>Organize Camp</span>
+                    </div>
+                    <div className="action-box" onClick={() => setCurrentView("users")}>
+                      <span className="action-box-icon">📋</span>
+                      <span>Export Data</span>
+                    </div>
+                    <div className="action-box" onClick={() => setCurrentView("organizers")}>
+                      <span className="action-box-icon">🤝</span>
+                      <span>View Organizers</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* --- 2. Camps Tab View --- */}
+        {currentView === "camps" && (
+          <div className="chart-card">
+            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <h2 className="text-danger fw-bold m-0">Camp Registrations</h2>
+              <div className="d-flex gap-2">
+                <button className="btn btn-primary" onClick={() => setShowAddCampModal(true)}>
+                  + Add Camp
+                </button>
+                <button className="btn btn-outline-secondary" onClick={fetchCamps}>
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            <div className="row g-3 mb-4 align-items-center">
+              <div className="col-md-5">
+                <div className="btn-group w-100">
+                  {["all", "upcoming", "done"].map((t) => (
+                    <button
+                      key={t}
+                      className={`btn ${tab === t ? "btn-danger" : "btn-outline-danger"}`}
+                      onClick={() => setTab(t)}
+                    >
+                      {t.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="col-md-7">
+                <div className="input-group">
+                  <span className="input-group-text bg-transparent border-end-0 text-muted">🔍</span>
+                  <input
+                    className="form-control border-start-0"
+                    placeholder="Search camp by name, hospital, location..."
+                    value={campQuery}
+                    onChange={(e) => setCampQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {loadingCamps ? (
+              <p className="text-center py-4">Loading camps database...</p>
+            ) : (
+              <div className="row g-4">
+                {(tab === "all" ? allCampsList : tab === "upcoming" ? upcomingCamps : doneCamps).map((camp) => {
+                  const past = !isUpcoming(toDate(camp?.date));
+                  const assignedOrg = camp.organizerId && typeof camp.organizerId === "object" ? camp.organizerId : null;
+
+                  return (
+                    <div className="col-md-6 col-lg-4" key={camp._id}>
+                      <div className="card h-100 shadow-sm border-0 position-relative">
+                        <div className="card-header bg-white border-bottom-0 d-flex justify-content-between align-items-start pt-3">
+                          <div>
+                            <h5 className="card-title text-danger fw-bold mb-1">{camp.name}</h5>
+                            <div className="d-flex align-items-center gap-2">
+                              <span className="badge bg-light text-dark border">
+                                📅 {camp.date ? new Date(camp.date).toLocaleDateString() : "No date"}
+                              </span>
+                              {whenBadge(camp.date)}
+                            </div>
+                          </div>
+                          <span className="badge bg-danger rounded-pill">
+                            Donors: {camp.donorCount || 0}
+                          </span>
+                        </div>
+
+                        <div className="card-body pt-0">
+                          <div className="mb-3 p-2 bg-light rounded border-start border-4 border-primary">
+                            <small className="text-muted text-uppercase fw-bold" style={{ fontSize: "0.7rem" }}>
+                              Assigned Organizer
+                            </small>
+                            <div className="d-flex flex-column">
+                              {assignedOrg ? (
+                                <>
+                                  <span className="fw-bold text-primary">{assignedOrg.name}</span>
+                                  <small className="text-muted">📞 {assignedOrg.phone}</small>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="fw-bold text-dark">{camp.organizerName || "Unassigned"}</span>
+                                  <small className="text-muted">📞 {camp.organizerContact || "N/A"}</small>
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          <p className="card-text small text-secondary">
+                            <strong>📍 Location:</strong> {camp.location || "N/A"} <br />
+                            <strong>🏥 Hospital:</strong> {camp.hospitalName || "N/A"} <br />
+                            <strong>👤 PRO:</strong> {camp.proName || "N/A"}
+                          </p>
+
+                          <div className="d-flex flex-wrap gap-2 mt-3">
+                            <button
+                              className="btn btn-outline-danger btn-sm flex-grow-1"
+                              onClick={() => {
+                                setSelectedCamp(camp._id);
+                                setCurrentView("users");
+                              }}
+                            >
+                              View Donors
+                            </button>
+
+                            <button className="btn btn-sm btn-light border" onClick={() => handleEditCampClick(camp)}>✏️</button>
+                            <button className="btn btn-sm btn-light border text-danger" onClick={() => handleDeleteCamp(camp._id)}>🗑️</button>
+
+                            <button
+                              className="btn btn-sm btn-primary"
+                              onClick={() => {
+                                if (past) return;
+                                const link = `${window.location.origin}/register-camp?campId=${camp._id}`;
+                                navigator.clipboard.writeText(link);
+                                alert("✅ Registration link copied to clipboard!");
+                              }}
+                              disabled={past}
+                            >
+                              🔗
+                            </button>
+                          </div>
+
+                          {editCampId === camp._id && (
+                            <div className="mt-3 border rounded p-3 bg-light shadow-sm position-absolute top-0 start-0 w-100 h-100 bg-white" style={{ zIndex: 10, overflowY: 'auto' }}>
+                              <h6 className="text-primary fw-bold mb-3">Edit Camp Details</h6>
+                              <div className="row g-2">
+                                {[
+                                  ["name", "Camp Name"],
+                                  ["location", "Location"],
+                                  ["date", "Date"],
+                                  ["organizerName", "Org. Name (Manual)"],
+                                  ["organizerContact", "Org. Contact (Manual)"],
+                                  ["proName", "PRO Name"],
+                                  ["hospitalName", "Hospital Name"],
+                                ].map(([key, label]) => (
+                                  <div className="col-12" key={key}>
+                                    <label className="form-label small mb-0 fw-bold text-muted">{label}</label>
+                                    <input
+                                      className="form-control form-control-sm"
+                                      name={key}
+                                      type={key === "date" ? "date" : "text"}
+                                      value={editCampForm[key] || ""}
+                                      onChange={handleEditCampChange}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="d-flex gap-2 mt-3">
+                                <button className="btn btn-sm btn-success flex-grow-1" onClick={() => handleEditCampSave(camp._id)}>
+                                  Save Changes
+                                </button>
+                                <button className="btn btn-sm btn-secondary" onClick={() => setEditCampId(null)}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- 3. Donors Tab View --- */}
+        {currentView === "users" && (
+          <div className="chart-card">
+            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <div>
+                <h2 className="text-danger fw-bold m-0">Donors Database</h2>
+                {camps.length > 0 && (
+                  <select
+                    className="form-select mt-2 w-auto"
+                    value={selectedCamp || ""}
+                    onChange={(e) => setSelectedCamp(e.target.value)}
+                  >
+                    <option value="">-- Select Camp --</option>
+                    {camps.map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <div className="d-flex gap-2">
+                <button className="btn btn-danger" onClick={downloadPDF} disabled={donors.length === 0}>
+                  📥 Export PDF Report
+                </button>
+                <button className="btn btn-outline-secondary" onClick={fetchDonors}>
+                  Refresh Table
+                </button>
+              </div>
+            </div>
+
+            <div className="custom-table-container">
+              {loadingDonors ? (
+                <p className="text-center py-4">Loading donors list...</p>
+              ) : donors.length === 0 ? (
+                <p className="text-center py-4 text-muted">No donors registered yet for this camp.</p>
+              ) : (
+                <table className="premium-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Group</th>
+                      <th>Age</th>
+                      <th>Weight</th>
+                      <th>Phone</th>
+                      <th>Address</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {donors.map((d, index) => (
+                      <tr key={d._id}>
+                        <td>{index + 1}</td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="name"
+                              value={editForm.name || ""}
+                              onChange={handleEditChange}
+                            />
+                          ) : (
+                            <span className="fw-semibold">{d.name}</span>
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <select
+                              className="form-select form-select-sm"
+                              name="bloodGroup"
+                              value={editForm.bloodGroup || ""}
+                              onChange={handleEditChange}
+                            >
+                              {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Unknown"].map((bg) => (
+                                <option key={bg} value={bg}>{bg}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="donor-table-group">{d.bloodGroup}</span>
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="age"
+                              type="number"
+                              value={editForm.age || ""}
+                              onChange={handleEditChange}
+                            />
+                          ) : (
+                            d.age
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="weight"
+                              type="number"
+                              value={editForm.weight || ""}
+                              onChange={handleEditChange}
+                            />
+                          ) : (
+                            `${d.weight || ""} kg`
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="phone"
+                              value={editForm.phone || ""}
+                              onChange={handleEditChange}
+                            />
+                          ) : (
+                            d.phone
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="address"
+                              value={editForm.address || ""}
+                              onChange={handleEditChange}
+                            />
+                          ) : (
+                            d.address
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <select
+                              className="form-select form-select-sm"
+                              name="remark"
+                              value={editForm.remark || "Pending"}
+                              onChange={handleEditChange}
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="Donated">Donated</option>
+                              <option value="Rejected">Rejected</option>
+                            </select>
+                          ) : (
+                            <span className={`status-badge ${d.remark === "Donated" ? "fulfilled" : d.remark === "Rejected" ? "urgent" : "pending"}`}>
+                              {d.remark || "Pending"}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {editDonorId === d._id ? (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-success" onClick={() => handleEditSave(d._id)}>✓</button>
+                              <button className="btn btn-sm btn-secondary" onClick={() => setEditDonorId(null)}>✕</button>
+                            </div>
+                          ) : (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditClick(d)}>✎</button>
+                              <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteDonor(d._id)}>🗑️</button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* --- 4. Enquiries Tab View --- */}
+        {currentView === "enquiries" && (
+          <div className="chart-card">
+            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <h2 className="text-danger fw-bold m-0">📋 Organizer Enquiries</h2>
+              <button className="btn btn-primary" onClick={fetchEnquiries}>
+                Refresh Enquiries
+              </button>
+            </div>
+
+            {/* Enquiries Filtering controls */}
+            <div className="row g-3 mb-4">
+              <div className="col-md-6">
+                <div className="btn-group w-100">
+                  {["pending", "approved", "rejected", "all"].map((t) => (
+                    <button
+                      key={t}
+                      className={`btn ${enquiriesTab === t ? "btn-danger" : "btn-outline-danger"}`}
+                      onClick={() => setEnquiriesTab(t)}
+                    >
+                      {t.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="col-md-6">
+                <input
+                  className="form-control"
+                  placeholder="Search enquiry..."
+                  value={enquiryQuery}
+                  onChange={(e) => setEnquiryQuery(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {loadingEnquiries ? (
+              <p className="text-center py-4">Loading enquiries...</p>
+            ) : filteredEnquiries.length === 0 ? (
+              <div className="text-center py-4 text-muted border border-dashed rounded p-4 bg-light">
+                No enquiries found.
+              </div>
+            ) : (
+              <div className="row g-4">
+                {filteredEnquiries.map((e) => (
+                  <div className="col-lg-6" key={e._id}>
+                    <div className={`card h-100 shadow-sm border-2 border-${e.status === "pending" ? "warning" : e.status === "approved" ? "success" : "secondary"}`}>
+                      <div className="card-header bg-transparent d-flex justify-content-between align-items-center">
+                        <h5 className="mb-0 text-danger fw-bold">{e.campName}</h5>
+                        <span className={`badge ${e.status === "pending" ? "bg-warning text-dark" : e.status === "approved" ? "bg-success" : "bg-secondary"}`}>
+                          {e.status.toUpperCase()}
+                        </span>
+                      </div>
+
+                      <div className="card-body">
+                        <div className="row">
+                          <div className="col-sm-6 mb-3">
+                            <h6 className="text-muted text-uppercase small fw-bold">Organizer Details</h6>
+                            <div className="fw-semibold">{e.organizerName}</div>
+                            <div className="small text-muted">📧 {e.email}</div>
+                            <div className="small text-muted">📞 {e.phone}</div>
+                          </div>
+                          <div className="col-sm-6 mb-3">
+                            <h6 className="text-muted text-uppercase small fw-bold">Camp Details</h6>
+                            <div className="small">📅 {e.campDate ? new Date(e.campDate).toLocaleDateString() : "TBA"}</div>
+                            <div className="small">📍 {e.campLocation}</div>
+                            <div className="small">🏥 {e.hospitalName}</div>
+                          </div>
+                        </div>
+
+                        {e.message && (
+                          <div className="alert alert-light border small p-2 mb-2 text-dark">
+                            <strong>Msg:</strong> {e.message}
+                          </div>
+                        )}
+                        {e.status === "rejected" && (
+                          <div className="alert alert-danger small p-2">
+                            <strong>Reason:</strong> {e.rejectionReason}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="card-footer bg-transparent">
+                        <div className="d-flex justify-content-between align-items-center mb-2">
+                          <small className="text-muted">
+                            Submitted: {new Date(e.createdAt).toLocaleDateString()}
+                          </small>
+
+                          <div className="btn-group">
+                            {e.status === "approved" && (
+                              <button
+                                className="btn btn-sm btn-outline-warning"
+                                onClick={() => {
+                                  setResetEnquiryModal(e);
+                                  setNewEnquiryPassword("");
+                                }}
+                              >
+                                🔑 Set Password
+                              </button>
+                            )}
+                            <button className="btn btn-sm btn-outline-primary" onClick={() => openEditEnquiryModal(e)}>
+                              ✏️ Edit
+                            </button>
+                            <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteEnquiry(e._id)}>
+                              🗑️ Delete
+                            </button>
+                          </div>
+                        </div>
+
+                        {e.status === "pending" && (
+                          <div className="mt-2 pt-2 border-top">
+                            <div className="input-group input-group-sm mb-2">
+                              <span className="input-group-text bg-transparent text-muted">Password</span>
+                              <input
+                                className="form-control"
+                                placeholder="Auto or Manual Password"
+                                value={passwordById[e._id] || ""}
+                                onChange={(ev) => setPasswordById({ ...passwordById, [e._id]: ev.target.value })}
+                              />
+                              <button className="btn btn-success" onClick={() => approveEnquiry(e._id)}>
+                                Approve
+                              </button>
+                            </div>
+                            <div className="input-group input-group-sm">
+                              <input
+                                className="form-control"
+                                placeholder="Rejection reason..."
+                                value={rejectReasonById[e._id] || ""}
+                                onChange={(ev) => setRejectReasonById({ ...rejectReasonById, [e._id]: ev.target.value })}
+                              />
+                              <button className="btn btn-secondary" onClick={() => rejectEnquiry(e._id)}>
+                                Reject
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ============================================================
+            VIEW: BLOOD REQUESTS
+            ============================================================ */}
+        {currentView === "blood-requests" && (
+          <div className="animate-fade-in space-y-6 max-w-7xl mx-auto pb-12">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-3xl font-black text-slate-800 font-cinzel mb-2">Emergency Blood Requests</h2>
+                <p className="text-slate-500 font-medium">Manage and update status of blood requests</p>
+              </div>
+              <button 
+                onClick={fetchBloodRequests}
+                className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {loadingBloodRequests ? (
+              <div className="flex justify-center py-20">
+                <div className="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : bloodRequests.length === 0 ? (
+              <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
+                <div className="text-6xl mb-4">🙌</div>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">No Active Requests</h3>
+                <p className="text-slate-500">There are currently no emergency blood requests.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {bloodRequests.map((req) => (
+                  <div key={req._id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">
+                          ID: {req.requestId}
+                        </span>
+                        <span className={`text-sm font-bold px-3 py-1 rounded-full border ${
+                          req.urgency === 'urgent' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
+                        }`}>
+                          {req.urgency === 'urgent' ? '🚨 Urgent' : '📅 Planned'}
+                        </span>
+                        <span className="text-sm font-bold bg-amber-50 text-amber-600 px-3 py-1 rounded-full border border-amber-200">
+                          {req.bloodGroup} (x{req.units})
+                        </span>
+                        <span className="text-xs text-slate-400 font-medium">
+                          {new Date(req.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-xl font-bold text-slate-800">{req.patientName}</h3>
+                        <p className="text-sm text-slate-500 font-medium">📍 {req.hospital}, {req.city}</p>
+                      </div>
+
+                      <div className="text-sm text-slate-600">
+                        <span className="font-semibold text-slate-800">Requested by:</span> {req.recipient?.name} ({req.recipient?.mobile})
+                      </div>
+                      {req.additionalInfo && (
+                        <div className="text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600 italic">
+                          "{req.additionalInfo}"
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="w-full md:w-auto bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-3 min-w-[200px]">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Status Control</div>
+                      
+                      <select 
+                        value={req.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          if(window.confirm(`Change status to ${newStatus}?`)) {
+                            try {
+                              await adminService.updateBloodRequestStatus(req.requestId, newStatus);
+                              fetchBloodRequests();
+                              alert("Status updated!");
+                            } catch(err) {
+                              alert("Error updating status");
+                            }
+                          }
+                        }}
+                        className={`w-full p-2.5 rounded-lg border-2 font-bold text-sm outline-none cursor-pointer appearance-none ${
+                          req.status === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-400' :
+                          req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400' :
+                          'border-green-200 bg-green-50 text-green-700 focus:border-green-400'
+                        }`}
+                      >
+                        <option value="pending">⏳ Pending Review</option>
+                        <option value="active">📡 Active (Notifying Donors)</option>
+                        <option value="fulfilled">✅ Fulfilled</option>
+                      </select>
+                      
+                      <div className="text-[10px] text-slate-400 font-medium text-center">
+                        Changes reflect live for the recipient
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- 5. Organizers Tab View --- */}
+        {currentView === "organizers" && (
+          <div className="chart-card">
+            <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+              <h2 className="text-danger fw-bold m-0">Organizers Directory</h2>
+              <button className="btn btn-outline-secondary" onClick={fetchOrganizersList}>
+                Refresh Organizers
+              </button>
+            </div>
+
+            {loadingOrganizers ? (
+              <p className="text-center py-4">Loading organizers database...</p>
+            ) : (
+              <div className="custom-table-container">
+                <table className="premium-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>Name</th>
+                      <th>Contact / Email</th>
+                      <th>Status</th>
+                      <th>Assigned Camps Details</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {organizersList.length > 0 ? (
+                      organizersList.map((org, index) => (
+                        <tr key={org._id}>
+                          <td>{index + 1}</td>
+                          <td>
+                            {editOrganizerId === org._id ? (
+                              <input
+                                className="form-control form-control-sm"
+                                name="name"
+                                value={editOrganizerForm.name}
+                                onChange={handleOrganizerFormChange}
+                              />
+                            ) : (
+                              <span className="fw-bold">{org.name}</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="small text-muted">📧 {org.email}</div>
+                            {editOrganizerId === org._id ? (
+                              <input
+                                className="form-control form-control-sm mt-1"
+                                name="phone"
+                                value={editOrganizerForm.phone}
+                                onChange={handleOrganizerFormChange}
+                              />
+                            ) : (
+                              <div className="small">📞 {org.phone}</div>
+                            )}
+                          </td>
+                          <td>
+                            {editOrganizerId === org._id ? (
+                              <select
+                                className="form-select form-select-sm"
+                                name="isActive"
+                                value={editOrganizerForm.isActive}
+                                onChange={(e) =>
+                                  setEditOrganizerForm({
+                                    ...editOrganizerForm,
+                                    isActive: e.target.value === "true",
+                                  })
+                                }
+                              >
+                                <option value="true">Active</option>
+                                <option value="false">Inactive</option>
+                              </select>
+                            ) : org.isActive ? (
+                              <span className="badge bg-success">Active</span>
+                            ) : (
+                              <span className="badge bg-secondary">Inactive</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                              <span className="badge bg-primary">Total Camps: {org.camps?.length || 0}</span>
+                            </div>
+                            {org.camps && org.camps.length > 0 ? (
+                              <ul className="list-group list-group-flush small bg-transparent">
+                                {org.camps.map((camp) => (
+                                  <li key={camp._id} className="list-group-item p-1 bg-transparent border-0 text-white">
+                                    ● {camp.name} ({new Date(camp.date).toLocaleDateString()})
+                                    <div className="text-muted small ps-3">📍 {camp.location}</div>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-muted fst-italic small">No camps assigned yet.</span>
+                            )}
+                          </td>
+                          <td>
+                            {editOrganizerId === org._id ? (
+                              <div className="btn-group">
+                                <button className="btn btn-sm btn-success" onClick={() => handleSaveOrganizer(org._id)}>Save</button>
+                                <button className="btn btn-sm btn-secondary" onClick={() => setEditOrganizerId(null)}>Cancel</button>
+                              </div>
+                            ) : (
+                              <div className="btn-group">
+                                <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditOrganizerClick(org)}>Edit</button>
+                                <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteOrganizer(org._id)}>Delete</button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="6" className="text-center py-4">No organizers found.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- 7. Impact Gallery Tab View --- */}
+        {currentView === "impact-gallery" && (
+          <div className="dashboard-details-grid pt-4">
+            <ImpactGalleryAdmin />
+          </div>
+        )}
+
+        {/* --- 8. Success Stories Tab View --- */}
+        {currentView === "success-stories" && (
+          <div className="dashboard-details-grid pt-4">
+            <SuccessStoriesAdmin />
+          </div>
+        )}
+
+        {/* --- 9. News & Awareness Tab View --- */}
+        {currentView === "news" && (
+          <div className="dashboard-details-grid pt-4">
+            <NewsAdmin />
+          </div>
+        )}
+
+        {/* --- 6. UI/UX Customizer View --- */}
+        {currentView === "uiux" && (
+          <div className="chart-card">
+            <h2 className="text-danger fw-bold mb-4">🎨 UI/UX Theme Customizer</h2>
+            <p className="text-muted small mb-4">Customize the landing/Home page's background dynamic styling in real-time.</p>
+
+            <div className="dark-form d-flex flex-column gap-4" style={{ maxWidth: "600px" }}>
+              <div>
+                <label className="form-label d-block fw-bold text-white mb-2">Select Background Type</label>
+                <select
+                  className="form-select"
+                  value={homeBgType}
+                  onChange={(e) => setHomeBgType(e.target.value)}
+                >
+                  <option value="gradient">Default Animated Orbs Gradient</option>
+                  <option value="image">Custom Background Image URL</option>
+                  <option value="video">Custom Background Video URL (Looping)</option>
+                </select>
+              </div>
+
+              {homeBgType !== "gradient" && (
+                <div>
+                  <label className="form-label d-block fw-bold text-white mb-2">Upload Local {homeBgType === "image" ? "Image" : "Video"} File (via Multer)</label>
+                  <input
+                    type="file"
+                    className="form-control text-white"
+                    accept={homeBgType === "image" ? "image/*" : "video/*"}
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                  />
+                  {uploading && <small className="text-warning mt-1 d-block">📤 Uploading file to server. Please wait...</small>}
+                </div>
+              )}
+
+              {homeBgType !== "gradient" && (
+                <div>
+                  <label className="form-label d-block fw-bold text-white mb-2">Enter Custom URL</label>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder={homeBgType === "image" ? "Enter absolute background image URL..." : "Enter absolute video source URL (.mp4)..."}
+                    value={homeBgUrl}
+                    onChange={(e) => setHomeBgUrl(e.target.value)}
+                  />
+                  <small className="text-muted mt-1 d-block">
+                    Paste an online link to any high-res image/video.
+                  </small>
+                </div>
+              )}
+
+              {/* Presets Grid */}
+              {homeBgType !== "gradient" && (
+                <div>
+                  <label className="form-label d-block fw-bold text-white mb-2">Stunning Presets</label>
+                  <div className="row g-2">
+                    {homeBgType === "image" ? (
+                      <>
+                        <div className="col-6">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger w-100 text-truncate"
+                            onClick={() => setHomeBgUrl("https://images.unsplash.com/photo-1579154769741-62b291563f45?auto=format&fit=crop&w=1920&q=80")}
+                          >
+                            Preset 1: Laboratory Tech
+                          </button>
+                        </div>
+                        <div className="col-6">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger w-100 text-truncate"
+                            onClick={() => setHomeBgUrl("https://images.unsplash.com/photo-1518152006812-edab29b069ac?auto=format&fit=crop&w=1920&q=80")}
+                          >
+                            Preset 2: Red Abstract Art
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="col-6">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger w-100 text-truncate"
+                            onClick={() => setHomeBgUrl("https://assets.mixkit.co/videos/preview/mixkit-cardiology-monitor-screen-loop-animation-43644-large.mp4")}
+                          >
+                            Preset 1: ECG cardiology Loop
+                          </button>
+                        </div>
+                        <div className="col-6">
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger w-100 text-truncate"
+                            onClick={() => setHomeBgUrl("https://assets.mixkit.co/videos/preview/mixkit-flying-through-a-red-futuristic-abstract-tunnel-41604-large.mp4")}
+                          >
+                            Preset 2: Red Flow Tunnel
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button className="btn btn-primary mt-2" onClick={handleSaveUIUX}>
+                💾 Save Theme Settings
+              </button>
+            </div>
+          </div>
+        )}
+
+        <footer className="copyright-footer">
+          © 2026 LifeDrop Admin Dashboard. All rights reserved.
+        </footer>
+      </main>
+
+      {/* --- ADD CAMP MODAL --- */}
+      {showAddCampModal && (
+        <div className="premium-modal-overlay">
+          <div className="premium-modal-content">
+            <button className="modal-close-btn" onClick={() => setShowAddCampModal(false)}>×</button>
+            <h4 className="text-danger fw-bold mb-4">Add New Donation Camp</h4>
+            
+            <form onSubmit={handleNewCampSubmit} className="dark-form d-flex flex-column gap-3">
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label>Camp Name</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    name="name"
+                    value={newCamp.name}
+                    onChange={handleNewCampChange}
+                    required
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label>Hospital Partner</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    name="hospitalName"
+                    value={newCamp.hospitalName}
+                    onChange={handleNewCampChange}
+                    required
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label>Location</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    name="location"
+                    value={newCamp.location}
+                    onChange={handleNewCampChange}
+                    required
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label>Date</label>
+                  <input
+                    className="form-control"
+                    type="date"
+                    name="date"
+                    value={newCamp.date}
+                    onChange={handleNewCampChange}
+                    required
+                  />
+                </div>
+                <div className="col-md-12">
+                  <label>Assign Active Organizer</label>
+                  <select
+                    className="form-select"
+                    name="organizerId"
+                    value={newCamp.organizerId}
+                    onChange={handleOrganizerSelect}
+                    required
+                  >
+                    <option value="">-- Select Organizer --</option>
+                    {organizersList.map((org) => (
+                      <option key={org._id} value={org._id}>
+                        {org.name} ({org.phone})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-md-6">
+                  <label>Organizer Contact</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    value={newCamp.organizerContact}
+                    readOnly
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label>PRO Name</label>
+                  <input
+                    className="form-control"
+                    type="text"
+                    name="proName"
+                    value={newCamp.proName}
+                    onChange={handleNewCampChange}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary mt-3">
+                Create & Publish Camp
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- ENQUIRY EDIT MODAL --- */}
+      {editingEnquiry && (
+        <div className="premium-modal-overlay">
+          <div className="premium-modal-content">
+            <button className="modal-close-btn" onClick={() => setEditingEnquiry(null)}>×</button>
+            <h4 className="text-danger fw-bold mb-4">Edit Enquiry Details</h4>
+            
+            <form onSubmit={(e) => { e.preventDefault(); saveEditEnquiry(); }} className="dark-form d-flex flex-column gap-3">
+              <div className="row g-2">
+                <div className="col-md-6">
+                  <label>Organizer Name</label>
+                  <input className="form-control" name="organizerName" value={editEnquiryForm.organizerName} onChange={handleEditEnquiryChange} />
+                </div>
+                <div className="col-md-6">
+                  <label>Phone</label>
+                  <input className="form-control" name="phone" value={editEnquiryForm.phone} onChange={handleEditEnquiryChange} />
+                </div>
+                <div className="col-12">
+                  <label>Email</label>
+                  <input className="form-control" name="email" value={editEnquiryForm.email} onChange={handleEditEnquiryChange} />
+                </div>
+                <div className="col-12"><hr className="border-secondary" /></div>
+                <div className="col-12">
+                  <label>Camp Name</label>
+                  <input className="form-control" name="campName" value={editEnquiryForm.campName} onChange={handleEditEnquiryChange} />
+                </div>
+                <div className="col-md-6">
+                  <label>Date</label>
+                  <input type="date" className="form-control" name="campDate" value={editEnquiryForm.campDate} onChange={handleEditEnquiryChange} />
+                </div>
+                <div className="col-md-6">
+                  <label>Hospital</label>
+                  <input className="form-control" name="hospitalName" value={editEnquiryForm.hospitalName} onChange={handleEditEnquiryChange} />
+                </div>
+                <div className="col-12">
+                  <label>Location</label>
+                  <textarea className="form-control" name="campLocation" rows="2" value={editEnquiryForm.campLocation} onChange={handleEditEnquiryChange}></textarea>
+                </div>
+                <div className="col-12">
+                  <label>Message</label>
+                  <textarea className="form-control" name="message" rows="2" value={editEnquiryForm.message} onChange={handleEditEnquiryChange}></textarea>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary mt-3">Save Changes</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- RESET ENQUIRY PASSWORD MODAL --- */}
+      {resetEnquiryModal && (
+        <div className="premium-modal-overlay">
+          <div className="premium-modal-content" style={{ maxWidth: "400px" }}>
+            <button className="modal-close-btn" onClick={() => setResetEnquiryModal(null)}>×</button>
+            <h4 className="text-danger fw-bold mb-3">🔑 Set New Password</h4>
+            <p className="small text-muted mb-3">Organizer: <strong>{resetEnquiryModal.organizerName}</strong></p>
+            
+            <div className="dark-form d-flex flex-column gap-3">
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter new password"
+                value={newEnquiryPassword}
+                onChange={(e) => setNewEnquiryPassword(e.target.value)}
+              />
+              <div className="d-flex justify-content-end gap-2">
+                <button className="btn btn-secondary" onClick={() => setResetEnquiryModal(null)}>Cancel</button>
+                <button className="btn btn-warning text-dark fw-bold" onClick={resetEnquiryPassword}>Update Password</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Admin;
