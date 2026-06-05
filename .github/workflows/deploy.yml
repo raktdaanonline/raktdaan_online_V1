@@ -54,7 +54,10 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            cd /opt/raktdaan
+            cd /home/ubuntu/blood-Donation
+
+            # Pull latest code
+            git pull origin main
 
             # Pull latest images
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-backend:latest
