@@ -52,7 +52,7 @@ ${E.lock} *Login Credentials:*
 ${E.mail} Email: ${email}
 Password: *${tempPassword}*
 
-${E.phone} Login: blooddonation.store/organizer-login
+${E.phone} Login: raktdaan.online/organizer-login
 
 ${E.warn} _Password zaroor change karein._
 
@@ -118,7 +118,7 @@ ${E.blood} Units collected: *${units}*
 ${E.heart} Lives saved: *${livesSaved}*
 
 Certificate dashboard mein available hai.
-blooddonation.store/organizer-dashboard
+raktdaan.online/organizer-dashboard
 
 Aapka shukriya! ${E.trophy}
 _Raktdaan Team_`.trim(),
@@ -156,7 +156,7 @@ ${E.cal} ${campDate}
 ${E.pin} ${venue}
 
 Aao aur ek zindagi bachao!
-Register: blooddonation.store/camps/${campId}
+Register: raktdaan.online/camps/${campId}
 
 _Raktdaan_`.trim(),
 

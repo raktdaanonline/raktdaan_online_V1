@@ -77,7 +77,7 @@ export default function CampRegistration() {
   };
 
   const shareWithFriends = () => {
-    const msg = `🩸 Blood Donation Camp!\n\n${camp.title}\n📅 Date: ${new Date(camp.date).toDateString()}\n📍 Venue: ${camp.venue}, ${camp.city}\n\nAao aur ek zindagi bachao!\nRegister: https://blooddonation.store/camps/${campId}`;
+    const msg = `🩸 Blood Donation Camp!\n\n${camp.title}\n📅 Date: ${new Date(camp.date).toDateString()}\n📍 Venue: ${camp.venue}, ${camp.city}\n\nAao aur ek zindagi bachao!\nRegister: https://raktdaan.online/camps/${campId}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -110,7 +110,7 @@ export default function CampRegistration() {
               : 'Link galat hai ya camp available nahi hai.'}
           </p>
           <a
-            href="https://blooddonation.store"
+            href="https://raktdaan.online"
             className="inline-block px-6 py-3 bg-[#E24B4A] text-white font-bold rounded-xl hover:bg-[#C23B3A] transition"
           >
             Raktdaan pe jaao
