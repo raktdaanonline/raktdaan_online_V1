@@ -67,22 +67,16 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             cd /var/www/raktdaan_online_V1
-
             # Pull latest code
             git pull origin main
-
             # Pull latest images
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-backend:latest
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-frontend:latest
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-admin:latest
-
-           # Restart all services with fresh images
+            # Restart all services with fresh images
             docker compose up -d --force-recreate --no-build backend frontend admin
-
             # Reload gateway nginx
             docker exec master-gateway nginx -s reload
-
             # Remove old images
             docker image prune -f
-
             echo "✅ Deployment complete!"
