@@ -66,7 +66,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            cd /home/ubuntu/blood-Donation
+            cd /var/www/raktdaan_online_V1
 
             # Pull latest code
             git pull origin main
