@@ -176,36 +176,7 @@ const OrganizerEnquiry = () => {
         </div>
 
         {/* Stats Grid */}
-        <div className="relative z-10 grid grid-cols-2 gap-3">
-           <div className="bg-[#0a0a0a] border border-zinc-900/80 rounded-2xl p-4 flex items-center gap-3">
-              <Users className="w-6 h-6 text-red-500/80" />
-              <div>
-                 <div className="text-white font-bold text-sm">850+</div>
-                 <div className="text-[10px] text-zinc-500">Camps Organized</div>
-              </div>
-           </div>
-           <div className="bg-[#0a0a0a] border border-zinc-900/80 rounded-2xl p-4 flex items-center gap-3">
-              <Droplet className="w-6 h-6 text-red-500/80 fill-red-500/20" />
-              <div>
-                 <div className="text-white font-bold text-sm">1,25,000+</div>
-                 <div className="text-[10px] text-zinc-500">Lives Impacted</div>
-              </div>
-           </div>
-           <div className="bg-[#0a0a0a] border border-zinc-900/80 rounded-2xl p-4 flex items-center gap-3">
-              <Building2 className="w-6 h-6 text-red-500/80" />
-              <div>
-                 <div className="text-white font-bold text-sm">50+</div>
-                 <div className="text-[10px] text-zinc-500">Partner Hospitals</div>
-              </div>
-           </div>
-           <div className="bg-[#0a0a0a] border border-zinc-900/80 rounded-2xl p-4 flex items-center gap-3">
-              <CheckCircle className="w-6 h-6 text-red-500/80" />
-              <div>
-                 <div className="text-white font-bold text-sm">100%</div>
-                 <div className="text-[10px] text-zinc-500">Safe & Secure</div>
-              </div>
-           </div>
-        </div>
+        
       </div>
 
       {/* RIGHT PANEL (FORM) */}

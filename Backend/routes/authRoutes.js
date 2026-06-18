@@ -96,10 +96,19 @@ router.post("/check-mobile", async (req, res) => {
 // Register or Login User after successful Firebase OTP verification
 router.post("/register", async (req, res) => {
   try {
-    const { name, mobile, bloodGroup, city, state, role } = req.body;
+    const { name, mobile, bloodGroup, city, state, role, age, weight } = req.body;
 
     if (!mobile) {
       return res.status(400).json({ success: false, message: "Mobile number is required" });
+    }
+
+    if (role === "donor" || (!role && req.body.isLogin === false)) {
+      if (age && parseInt(age) < 18) {
+        return res.status(400).json({ success: false, message: "We appreciate your willingness to save lives, but you do not meet the minimum eligibility requirements to register on this platform." });
+      }
+      if (weight && parseFloat(weight) < 50) {
+        return res.status(400).json({ success: false, message: "We appreciate your willingness to save lives, but you do not meet the minimum eligibility requirements to register on this platform." });
+      }
     }
 
     // Check if user already exists
@@ -121,6 +130,10 @@ router.post("/register", async (req, res) => {
         state,
         role: role || "donor",
         isVerified: true,
+        health: {
+          age: age ? parseInt(age) : undefined,
+          weight: weight ? parseFloat(weight) : undefined
+        }
       });
       await user.save();
     }
@@ -236,7 +249,18 @@ router.post("/organizer-login", async (req, res) => {
 
     let user = await User.findOne({ email, role: "organizer" });
     if (!user) {
-      user = await Organizer.findOne({ email });
+      const legacyOrg = await Organizer.findOne({ email });
+      if (legacyOrg) {
+        // Resolve corresponding User model to ensure alignment with Camp.organizer ID
+        const correspondingUser = await User.findOne({
+          role: "organizer",
+          $or: [
+            { email: legacyOrg.email },
+            { mobile: legacyOrg.phone }
+          ]
+        });
+        user = correspondingUser || legacyOrg;
+      }
     }
 
     if (!user) return res.status(400).json({ success: false, message: "Invalid credentials or not an organizer" });

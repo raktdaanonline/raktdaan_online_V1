@@ -155,8 +155,7 @@ _Raktdaan Emergency_`.trim(),
 ${E.cal} ${campDate}
 ${E.pin} ${venue}
 
-Aao aur ek zindagi bachao!
-Register: raktdaan.online/camps/${campId}
+Join us and save a life! Register Now.r: raktdaan.online/camps/${campId}
 
 _Raktdaan_`.trim(),
 

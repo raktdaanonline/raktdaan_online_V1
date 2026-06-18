@@ -266,7 +266,7 @@ const Footer = () => {
           <div>
             <h4 className="text-white font-bold text-sm uppercase tracking-widest mb-4">Resources</h4>
             <div className="flex flex-col gap-2">
-              <NavLink to="/admin-login" className="text-slate-400 no-underline text-sm hover:text-red-400 transition-colors duration-200">Admin Login</NavLink>
+              {/* <NavLink to="/admin-login" className="text-slate-400 no-underline text-sm hover:text-red-400 transition-colors duration-200">Admin Login</NavLink> */}
               <span className="text-slate-400 text-sm cursor-pointer hover:text-slate-300 transition-colors">Privacy Policy</span>
               <span className="text-slate-400 text-sm cursor-pointer hover:text-slate-300 transition-colors">Terms of Service</span>
               <span className="text-slate-400 text-sm cursor-pointer hover:text-slate-300 transition-colors">Cookie Policy</span>

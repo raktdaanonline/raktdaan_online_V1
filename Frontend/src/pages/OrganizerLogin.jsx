@@ -194,9 +194,9 @@ const OrganizerLogin = () => {
                       <polyline points="20 6 9 17 4 12"></polyline>
                     </svg>
                   </div>
-                  <span className="text-zinc-400 text-sm group-hover:text-zinc-300 transition-colors">Remember me</span>
+                 {/* <span className="text-zinc-400 text-sm group-hover:text-zinc-300 transition-colors">Remember me</span> */}
                 </label>
-                <a href="#" className="text-red-500 text-sm font-medium hover:text-red-400 transition-colors">Forgot Password?</a>
+                {/* <a href="#" className="text-red-500 text-sm font-medium hover:text-red-400 transition-colors">Forgot Password?</a> */}
               </div>
 
               <button

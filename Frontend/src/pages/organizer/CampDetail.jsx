@@ -13,7 +13,8 @@ const CampDetail = () => {
   const [error, setError] = useState('');
   const [shareModal, setShareModal] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const navigate = useNavigate();
 
@@ -43,7 +44,7 @@ const CampDetail = () => {
   };
 
   const getStatusBadge = (status) => {
-    switch(status.toLowerCase()) {
+    switch (status.toLowerCase()) {
       case 'upcoming': return <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Upcoming</span>;
       case 'completed': return <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Completed</span>;
       case 'cancelled': return <span className="bg-red-100 text-red-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Cancelled</span>;
@@ -64,12 +65,12 @@ const CampDetail = () => {
     if (!camp || camp.status !== 'upcoming') return null;
     const diff = new Date(camp.date) - new Date();
     if (diff <= 0) return null;
-    
+
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
     const minutes = Math.floor((diff / 1000 / 60) % 60);
     const seconds = Math.floor((diff / 1000) % 60);
-    
+
     return { days, hours, minutes, seconds };
   };
 
@@ -91,40 +92,66 @@ const CampDetail = () => {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col md:flex-row font-sans relative">
-      
+
+      {/* MOBILE HEADER */}
+      <div className="md:hidden flex items-center justify-between bg-[#1C1C28] text-white p-4 fixed top-0 left-0 right-0 z-50 border-b border-white/5 shadow-md">
+        <div className="flex items-center gap-2">
+          <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
+          <span className="font-bold text-lg">Raktdaan</span>
+        </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* MOBILE BACKDROP OVERLAY */}
+      {isSidebarOpen && (
+        <div onClick={() => setIsSidebarOpen(false)} className="md:hidden fixed inset-0 bg-black/55 z-30 transition-opacity" />
+      )}
+
       {/* SIDEBAR */}
-      <aside className="hidden md:flex w-64 bg-[#1C1C28] text-gray-300 flex-col h-screen fixed top-0 left-0 z-40">
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#1C1C28] text-gray-300 flex flex-col z-40 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-5 pb-2">
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
-            <div>
-              <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
-              <p className="text-[10px] text-gray-400">Organizer Panel</p>
+          <div className="flex items-center justify-between gap-2.5 mb-6">
+            <div className="flex items-center gap-2.5">
+              <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
+              <div>
+                <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
+                <p className="text-[10px] text-gray-400">Organizer Panel</p>
+              </div>
             </div>
+            {/* Close button for mobile */}
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <p className="text-[10px] font-semibold tracking-wider text-gray-500 mb-3 px-2">MAIN</p>
         </div>
 
         <nav className="flex-1 px-3 space-y-1">
-          <Link to="/organizer-dashboard/dashboard" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/dashboard" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <LayoutDashboard className="w-4 h-4" /> Dashboard
           </Link>
-          <Link to="/organizer-dashboard/my-camps" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition bg-[#E74C3C] text-white shadow-sm">
+          <Link to="/organizer-dashboard/my-camps" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition bg-[#E74C3C] text-white shadow-sm">
             <Tent className="w-4 h-4" /> My Camps
           </Link>
-          <Link to="/organizer-dashboard/registrations" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/registrations" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <Users className="w-4 h-4" /> Registrations
           </Link>
-          <Link to="/organizer-dashboard/reports" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/reports" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <FileText className="w-4 h-4" /> Reports
           </Link>
-          <Link to="/organizer-dashboard/gallery" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/gallery" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <Image className="w-4 h-4" /> Gallery
           </Link>
         </nav>
 
         <div className="p-3 border-t border-white/10 mt-auto">
-          <Link to="/organizer/change-password" className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
+          <Link to="/organizer/change-password" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
             <KeyRound className="w-4 h-4" />
             <span className="font-medium">Change Password</span>
           </Link>
@@ -144,9 +171,9 @@ const CampDetail = () => {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-6 md:p-10 w-full md:w-[calc(100%-16rem)] md:ml-64">
+      <main className="flex-1 p-6 pt-24 md:pt-10 w-full md:w-[calc(100%-16rem)] md:ml-64">
         <div className="max-w-5xl mx-auto space-y-8">
-          
+
           {/* SECTION 1 - TOP BAR */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-100 pb-6">
             <div className="flex items-center gap-4">
@@ -226,7 +253,7 @@ const CampDetail = () => {
                 <div className="bg-[#E24B4A] h-full rounded-full transition-all duration-1000" style={{ width: `${filledPercentage}%` }}></div>
               </div>
               <p className="text-xs text-gray-500 mb-4 font-medium">Expected: {camp.expectedDonors} donors</p>
-              
+
               {camp.registeredCount === 0 ? (
                 <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-2.5 rounded-lg text-sm font-medium">
                   Slots bhar rahe hain — share karo!
@@ -263,7 +290,7 @@ const CampDetail = () => {
                     {step.subtitle && <span className="text-[10px] text-gray-400 mt-1">{step.subtitle}</span>}
                   </div>
                   {idx < arr.length - 1 && (
-                    <div className={`flex-1 h-1 -mx-8 -mt-6 z-0 ${arr[idx+1].status === 'completed' ? 'bg-[#E24B4A]' : 'bg-gray-100'}`}></div>
+                    <div className={`flex-1 h-1 -mx-8 -mt-6 z-0 ${arr[idx + 1].status === 'completed' ? 'bg-[#E24B4A]' : 'bg-gray-100'}`}></div>
                   )}
                 </React.Fragment>
               ))}
@@ -276,7 +303,7 @@ const CampDetail = () => {
               <h3 className="text-gray-900 font-bold">Registered donors</h3>
               {camp.registeredCount > 0 && <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-xs font-bold">{camp.registeredCount}</span>}
             </div>
-            
+
             {camp.registeredCount === 0 ? (
               <div className="text-center py-10 px-4">
                 <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border border-gray-100">
@@ -294,7 +321,7 @@ const CampDetail = () => {
                   const colors = ['bg-amber-100 text-amber-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-emerald-100 text-emerald-700'];
                   const colorClass = colors[idx % colors.length];
                   const initial = donor.name.charAt(0).toUpperCase();
-                  
+
                   return (
                     <div key={donor._id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition border border-transparent hover:border-gray-100">
                       <div className="flex items-center gap-4">

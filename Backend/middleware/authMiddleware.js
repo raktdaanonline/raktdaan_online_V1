@@ -24,6 +24,20 @@ export const verifyOrganizerToken = async (req, res, next) => {
     if (!org) {
       const { default: Organizer } = await import("../models/Organizer.js");
       org = await Organizer.findById(decoded.id);
+      
+      if (org) {
+        // Find corresponding User entry to align with Camp.organizer ID
+        const correspondingUser = await User.findOne({
+          role: "organizer",
+          $or: [
+            { email: org.email },
+            { mobile: org.phone }
+          ]
+        });
+        if (correspondingUser) {
+          org = correspondingUser;
+        }
+      }
     }
     if (!org || !org.isActive) return res.status(401).json({ message: "Organizer not found / inactive" });
 

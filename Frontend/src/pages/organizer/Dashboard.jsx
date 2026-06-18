@@ -10,6 +10,7 @@ const OrganizerDashboard = () => {
   const [camps, setCamps] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const navigate = useNavigate();
 
@@ -37,7 +38,7 @@ const OrganizerDashboard = () => {
   const totalCamps = camps.length;
   const completedCamps = camps.filter(c => c.status === 'completed');
   const upcomingCamps = camps.filter(c => c.status !== 'completed').sort((a, b) => new Date(a.date) - new Date(b.date));
-  
+
   const totalDonors = camps.reduce((sum, c) => sum + (c.totalDonors || c.registeredDonors?.length || 0), 0);
   const unitsCollected = completedCamps.reduce((sum, c) => sum + (c.totalUnitsCollected || 0), 0);
   const livesSaved = unitsCollected * 3;
@@ -57,7 +58,7 @@ const OrganizerDashboard = () => {
   const renderCampCard = (camp) => {
     const { day, month } = getShortDate(camp.date);
     const isCompleted = camp.status === 'completed';
-    
+
     return (
       <div key={camp._id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col md:flex-row items-start md:items-center gap-6 transition hover:shadow-md">
         <div className="bg-red-50 text-red-600 font-bold rounded-xl w-16 h-16 flex flex-col items-center justify-center shrink-0 border border-red-100">
@@ -177,17 +178,17 @@ const OrganizerDashboard = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {upcomingCamps.map(camp => (
             <div key={camp._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col justify-between">
-               <div>
-                 <h3 className="text-lg font-bold text-gray-900 mb-2">{camp.title || camp.name}</h3>
-                 <p className="text-gray-500 text-sm mb-4"><MapPin className="w-4 h-4 inline mr-1" /> {camp.venue || camp.location}</p>
-                 <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
-                   <p className="text-3xl font-bold text-blue-600">{camp.registeredDonors?.length || 0}</p>
-                   <p className="text-xs text-blue-800 uppercase font-semibold">Registered Donors</p>
-                 </div>
-               </div>
-               <Link to={`/organizer/camp/${camp._id}`} className="text-red-600 font-medium hover:underline text-sm inline-flex items-center">
-                 Manage Registration List <ArrowUpRight className="w-4 h-4 ml-1" />
-               </Link>
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">{camp.title || camp.name}</h3>
+                <p className="text-gray-500 text-sm mb-4"><MapPin className="w-4 h-4 inline mr-1" /> {camp.venue || camp.location}</p>
+                <div className="bg-blue-50 p-4 rounded-xl mb-4 border border-blue-100">
+                  <p className="text-3xl font-bold text-blue-600">{camp.registeredDonors?.length || 0}</p>
+                  <p className="text-xs text-blue-800 uppercase font-semibold">Registered Donors</p>
+                </div>
+              </div>
+              <Link to={`/organizer/camp/${camp._id}`} className="text-red-600 font-medium hover:underline text-sm inline-flex items-center">
+                Manage Registration List <ArrowUpRight className="w-4 h-4 ml-1" />
+              </Link>
             </div>
           ))}
         </div>
@@ -201,13 +202,13 @@ const OrganizerDashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {completedCamps.length === 0 ? <p className="text-gray-500">No completed camps yet.</p> : completedCamps.map(camp => (
           <div key={camp._id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-             <h3 className="text-lg font-bold text-gray-900 mb-4">{camp.title || camp.name}</h3>
-             <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-6">
-               <div className="text-center"><p className="text-2xl font-bold text-emerald-600">{camp.totalDonors}</p><p className="text-xs text-emerald-800 font-semibold uppercase mt-1">Donors</p></div>
-               <div className="text-center"><p className="text-2xl font-bold text-indigo-600">{camp.totalUnitsCollected}</p><p className="text-xs text-indigo-800 font-semibold uppercase mt-1">Units</p></div>
-               <div className="text-center"><p className="text-2xl font-bold text-red-500">{camp.totalUnitsCollected * 3}</p><p className="text-xs text-red-800 font-semibold uppercase mt-1">Lives</p></div>
-             </div>
-             <Link to={`/organizer/camp/${camp._id}`} className="w-full block text-center py-2.5 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-medium transition">View Full Report</Link>
+            <h3 className="text-lg font-bold text-gray-900 mb-4">{camp.title || camp.name}</h3>
+            <div className="flex justify-between items-center bg-emerald-50 border border-emerald-100 p-4 rounded-xl mb-6">
+              <div className="text-center"><p className="text-2xl font-bold text-emerald-600">{camp.totalDonors}</p><p className="text-xs text-emerald-800 font-semibold uppercase mt-1">Donors</p></div>
+              <div className="text-center"><p className="text-2xl font-bold text-indigo-600">{camp.totalUnitsCollected}</p><p className="text-xs text-indigo-800 font-semibold uppercase mt-1">Units</p></div>
+              <div className="text-center"><p className="text-2xl font-bold text-red-500">{camp.totalUnitsCollected * 3}</p><p className="text-xs text-red-800 font-semibold uppercase mt-1">Lives</p></div>
+            </div>
+            <Link to={`/organizer/camp/${camp._id}`} className="w-full block text-center py-2.5 border border-red-200 text-red-600 rounded-xl hover:bg-red-50 font-medium transition">View Full Report</Link>
           </div>
         ))}
       </div>
@@ -239,44 +240,70 @@ const OrganizerDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col md:flex-row font-sans relative">
-      
+
+      {/* MOBILE HEADER */}
+      <div className="md:hidden flex items-center justify-between bg-[#1C1C28] text-white p-4 fixed top-0 left-0 right-0 z-50 border-b border-white/5 shadow-md">
+        <div className="flex items-center gap-2">
+          <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
+          <span className="font-bold text-lg">Raktdaan</span>
+        </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* MOBILE BACKDROP OVERLAY */}
+      {isSidebarOpen && (
+        <div onClick={() => setIsSidebarOpen(false)} className="md:hidden fixed inset-0 bg-black/55 z-30 transition-opacity" />
+      )}
+
       {/* SIDEBAR */}
-      <aside className="hidden md:flex w-64 bg-[#1C1C28] text-gray-300 flex-col h-screen fixed top-0 left-0 z-40">
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#1C1C28] text-gray-300 flex flex-col z-40 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-5 pb-2">
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
-            <div>
-              <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
-              <p className="text-[10px] text-gray-400">Organizer Panel</p>
+          <div className="flex items-center justify-between gap-2.5 mb-6">
+            <div className="flex items-center gap-2.5">
+              <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
+              <div>
+                <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
+                <p className="text-[10px] text-gray-400">Organizer Panel</p>
+              </div>
             </div>
+            {/* Close button for mobile */}
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <p className="text-[10px] font-semibold tracking-wider text-gray-500 mb-3 px-2">MAIN</p>
         </div>
 
         <nav className="flex-1 px-3 space-y-1">
-          <button onClick={() => navigate('/organizer-dashboard/dashboard')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'dashboard' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setIsSidebarOpen(false); navigate('/organizer-dashboard/dashboard'); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'dashboard' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
             <LayoutDashboard className="w-4 h-4" /> Dashboard
           </button>
-          <button onClick={() => navigate('/organizer-dashboard/my-camps')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'my-camps' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setIsSidebarOpen(false); navigate('/organizer-dashboard/my-camps'); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'my-camps' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
             <Tent className="w-4 h-4" /> My Camps
           </button>
-          <button onClick={() => navigate('/organizer-dashboard/registrations')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'registrations' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setIsSidebarOpen(false); navigate('/organizer-dashboard/registrations'); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'registrations' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
             <Users className="w-4 h-4" /> Registrations
           </button>
-          <button onClick={() => navigate('/organizer-dashboard/reports')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'reports' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setIsSidebarOpen(false); navigate('/organizer-dashboard/reports'); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'reports' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
             <FileText className="w-4 h-4" /> Reports
           </button>
-          <button onClick={() => navigate('/organizer-dashboard/gallery')} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'gallery' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <button onClick={() => { setIsSidebarOpen(false); navigate('/organizer-dashboard/gallery'); }} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'gallery' ? 'bg-[#E74C3C] text-white shadow-sm' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
             <Image className="w-4 h-4" /> Gallery
           </button>
-          <Link to="/organizer/dashboard/whatsapp-connect" className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'whatsapp-connect' ? 'bg-[#E74C3C] text-white shadow-lg shadow-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
+          <Link to="/organizer/dashboard/whatsapp-connect" onClick={() => setIsSidebarOpen(false)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition ${activeTab === 'whatsapp-connect' ? 'bg-[#E74C3C] text-white shadow-lg shadow-red-500/20' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}>
             <MessageSquare className="w-4 h-4" />
             <span>WhatsApp Connect</span>
           </Link>
         </nav>
 
         <div className="p-3 border-t border-white/10 mt-auto">
-          <Link to="/organizer/change-password" className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
+          <Link to="/organizer/change-password" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
             <KeyRound className="w-4 h-4" />
             <span className="font-medium">Change Password</span>
           </Link>
@@ -296,25 +323,25 @@ const OrganizerDashboard = () => {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-6 md:p-10 w-full md:w-[calc(100%-16rem)] md:ml-64">
+      <main className="flex-1 p-6 pt-24 md:pt-10 w-full md:w-[calc(100%-16rem)] md:ml-64">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Namaste, {user.name?.split(' ')[0] || 'ji'}!</h2>
-            <p className="text-sm text-gray-500 mt-1">{formatDate(new Date())}</p>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Welcome😊, {user.name?.split(' ')[0] || 'ji'}!</h2>
+              <p className="text-sm text-gray-500 mt-1">{formatDate(new Date())}</p>
+            </div>
+            <Link to="/organizer-enquiry" className="inline-flex items-center gap-2 bg-[#E74C3C] text-white px-5 py-2.5 rounded-xl font-medium hover:bg-red-700 transition shadow-sm shrink-0">
+              <Plus className="w-4 h-4" /> New camp request
+            </Link>
           </div>
-          <Link to="/organizer-enquiry" className="inline-flex items-center gap-2 bg-[#E74C3C] text-white px-5 py-2.5 rounded-xl font-medium hover:bg-red-700 transition shadow-sm shrink-0">
-            <Plus className="w-4 h-4" /> New camp request
-          </Link>
-        </div>
 
-        {activeTab === 'dashboard' && renderDashboard()}
-        {activeTab === 'my-camps' && renderMyCamps()}
-        {activeTab === 'registrations' && renderRegistrations()}
-        {activeTab === 'reports' && renderReports()}
-        {activeTab === 'gallery' && renderGallery()}
-        {activeTab === 'whatsapp-connect' && <OrganizerWhatsAppConnect />}
-        
+          {activeTab === 'dashboard' && renderDashboard()}
+          {activeTab === 'my-camps' && renderMyCamps()}
+          {activeTab === 'registrations' && renderRegistrations()}
+          {activeTab === 'reports' && renderReports()}
+          {activeTab === 'gallery' && renderGallery()}
+          {activeTab === 'whatsapp-connect' && <OrganizerWhatsAppConnect />}
+
         </div>
       </main>
     </div>

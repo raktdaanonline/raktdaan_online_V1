@@ -13,7 +13,8 @@ const Registrations = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [visibleDonors, setVisibleDonors] = useState(10);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
   const user = JSON.parse(localStorage.getItem('user')) || {};
   const navigate = useNavigate();
 
@@ -22,7 +23,7 @@ const Registrations = () => {
     const fetchCamps = async () => {
       try {
         const data = await organizerService.getMyCamps();
-        
+
         if (data && data.length > 0) {
           setCamps(data);
           // Auto-select the first upcoming camp, or the first overall if none upcoming
@@ -51,7 +52,7 @@ const Registrations = () => {
       setLoading(true);
       try {
         const data = await organizerService.getCampRegistrations(selectedCampId);
-        
+
         if (data.success) {
           setRegistrationData(data);
           setVisibleDonors(10); // reset visible count
@@ -90,11 +91,11 @@ const Registrations = () => {
       new Date(donor.registeredAt).toLocaleString(),
       donor.status
     ]);
-    
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + headers.join(',') + "\n" 
+
+    const csvContent = "data:text/csv;charset=utf-8,"
+      + headers.join(',') + "\n"
       + rows.map(e => e.join(",")).join("\n");
-      
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -122,41 +123,67 @@ const Registrations = () => {
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] flex flex-col md:flex-row font-sans relative">
-      
+
+      {/* MOBILE HEADER */}
+      <div className="md:hidden flex items-center justify-between bg-[#1C1C28] text-white p-4 fixed top-0 left-0 right-0 z-50 border-b border-white/5 shadow-md">
+        <div className="flex items-center gap-2">
+          <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
+          <span className="font-bold text-lg">Raktdaan</span>
+        </div>
+        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 hover:bg-white/10 rounded-lg text-white transition-colors">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* MOBILE BACKDROP OVERLAY */}
+      {isSidebarOpen && (
+        <div onClick={() => setIsSidebarOpen(false)} className="md:hidden fixed inset-0 bg-black/55 z-30 transition-opacity" />
+      )}
+
       {/* SIDEBAR */}
-      <aside className="hidden md:flex w-64 bg-[#1C1C28] text-gray-300 flex-col h-screen fixed top-0 left-0 z-40">
+      <aside className={`fixed top-0 left-0 h-screen w-64 bg-[#1C1C28] text-gray-300 flex flex-col z-40 transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
         <div className="p-5 pb-2">
-          <div className="flex items-center gap-2.5 mb-6">
-            <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
-            <div>
-              <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
-              <p className="text-[10px] text-gray-400">Organizer Panel</p>
+          <div className="flex items-center justify-between gap-2.5 mb-6">
+            <div className="flex items-center gap-2.5">
+              <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
+              <div>
+                <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
+                <p className="text-[10px] text-gray-400">Organizer Panel</p>
+              </div>
             </div>
+            {/* Close button for mobile */}
+            <button onClick={() => setIsSidebarOpen(false)} className="md:hidden text-gray-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
           <WAStatus />
           <p className="text-[10px] font-semibold tracking-wider text-gray-500 mb-3 px-2 mt-4">MAIN</p>
         </div>
 
         <nav className="flex-1 px-3 space-y-1">
-          <Link to="/organizer-dashboard/dashboard" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/dashboard" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <LayoutDashboard className="w-4 h-4" /> Dashboard
           </Link>
-          <Link to="/organizer-dashboard/my-camps" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/my-camps" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <Tent className="w-4 h-4" /> My Camps
           </Link>
-          <Link to="/organizer-dashboard/registrations" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition bg-[#E74C3C] text-white shadow-sm">
+          <Link to="/organizer-dashboard/registrations" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition bg-[#E74C3C] text-white shadow-sm">
             <Users className="w-4 h-4" /> Registrations
           </Link>
-          <Link to="/organizer-dashboard/reports" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/reports" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <FileText className="w-4 h-4" /> Reports
           </Link>
-          <Link to="/organizer-dashboard/gallery" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+          <Link to="/organizer-dashboard/gallery" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
             <Image className="w-4 h-4" /> Gallery
           </Link>
         </nav>
 
         <div className="p-3 border-t border-white/10 mt-auto">
-          <Link to="/organizer/change-password" className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
+          <Link to="/organizer/change-password" onClick={() => setIsSidebarOpen(false)} className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
             <KeyRound className="w-4 h-4" />
             <span className="font-medium">Change Password</span>
           </Link>
@@ -176,9 +203,9 @@ const Registrations = () => {
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-6 md:p-10 w-full md:w-[calc(100%-16rem)] md:ml-64">
+      <main className="flex-1 p-6 pt-24 md:pt-10 w-full md:w-[calc(100%-16rem)] md:ml-64">
         <div className="max-w-6xl mx-auto space-y-8">
-          
+
           {/* SECTION 1 - HEADER ROW */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -186,7 +213,7 @@ const Registrations = () => {
               <p className="text-sm text-gray-500 mt-1">Kaun kaun donors aane wale hain</p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <select 
+              <select
                 className="bg-white border border-gray-200 text-gray-700 rounded-xl px-4 py-2.5 outline-none focus:ring-2 focus:ring-[#E24B4A] focus:border-transparent font-medium"
                 value={selectedCampId}
                 onChange={(e) => setSelectedCampId(e.target.value)}
@@ -202,7 +229,7 @@ const Registrations = () => {
                   ))
                 )}
               </select>
-              <button 
+              <button
                 onClick={handleWhatsAppShare}
                 disabled={!registrationData}
                 className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1DA851] text-white px-5 py-2.5 rounded-xl font-medium transition shadow-sm disabled:opacity-50"
@@ -251,7 +278,7 @@ const Registrations = () => {
                   <div className="w-full bg-gray-100 h-2 rounded-[20px] mb-5 overflow-hidden">
                     <div className="bg-[#E24B4A] h-full rounded-[20px]" style={{ width: `${registrationData.stats.progressPercent}%` }}></div>
                   </div>
-                  
+
                   {registrationData.stats.progressPercent >= 100 ? (
                     <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm font-medium">
                       Camp full ho gaya!
@@ -295,15 +322,15 @@ const Registrations = () => {
                   <div className="flex items-center gap-3 w-full sm:w-auto">
                     <div className="relative flex-1 sm:flex-none">
                       <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-                      <input 
-                        type="text" 
-                        placeholder="Search donor..." 
+                      <input
+                        type="text"
+                        placeholder="Search donor..."
                         className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl w-full sm:w-64 text-sm focus:outline-none focus:border-red-400 focus:bg-white transition"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                       />
                     </div>
-                    <button 
+                    <button
                       onClick={downloadCSV}
                       disabled={filteredDonors.length === 0}
                       className="p-2.5 bg-gray-50 border border-gray-200 text-gray-600 rounded-xl hover:bg-gray-100 transition disabled:opacity-50"
@@ -348,7 +375,7 @@ const Registrations = () => {
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-3">
                             <span className={`px-2 py-1 text-[10px] font-bold rounded-md border ${getBloodGroupColor(donor.bloodGroup)} border-transparent bg-opacity-50`}>
                               {donor.bloodGroup}
@@ -362,11 +389,11 @@ const Registrations = () => {
                         </div>
                       ))}
                     </div>
-                    
+
                     {visibleDonors < filteredDonors.length && (
                       <div className="mt-6 text-center">
                         <p className="text-sm text-gray-500 mb-3 font-medium">+ {filteredDonors.length - visibleDonors} aur donors registered hain</p>
-                        <button 
+                        <button
                           onClick={() => setVisibleDonors(prev => prev + 10)}
                           className="px-6 py-2 bg-gray-50 border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition text-sm"
                         >
@@ -395,4 +422,3 @@ const Registrations = () => {
 };
 
 export default Registrations;
-  

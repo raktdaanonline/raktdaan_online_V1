@@ -26,7 +26,9 @@ const OtpRegister = () => {
     bloodGroup: "",
     city: "",
     state: "",
-    role: role
+    role: role,
+    age: "",
+    weight: ""
   });
   const [loading, setLoading] = useState(false);
 
@@ -75,6 +77,24 @@ const OtpRegister = () => {
       if (!formData.name || !formData.mobile || !formData.bloodGroup || !formData.state) {
         toast.error("Please fill all required fields");
         return;
+      }
+      
+      if (role === "donor") {
+        if (!formData.age || !formData.weight) {
+          toast.error("Please enter your age and weight");
+          return;
+        }
+        
+        const ageVal = parseInt(formData.age);
+        const weightVal = parseFloat(formData.weight);
+        
+        if (isNaN(ageVal) || ageVal < 18 || isNaN(weightVal) || weightVal < 50) {
+          toast.error(
+            "We appreciate your noble willingness to donate blood. However, to ensure donor safety, registration is restricted to individuals who are at least 18 years of age and weigh 50 kg or more. You are not eligible to register on this platform at this time.",
+            { duration: 7000 }
+          );
+          return;
+        }
       }
     } else {
       if (!formData.name || !formData.mobile) {
@@ -320,11 +340,39 @@ const OtpRegister = () => {
                         : "bg-[#141414] border-white/10 text-gray-400 hover:border-[#E11D48]/50 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    {bg}
-                  </button>
+                    {bg
+                  }</button>
                 ))}
               </div>
             </div>
+
+            {/* Age & Weight Grid for Donors */}
+            {role === "donor" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-300 mb-1.5 ml-1 tracking-wide uppercase">Age (years)</label>
+                  <input
+                    type="number"
+                    value={formData.age}
+                    onChange={(e) => setFormData({ ...formData, age: e.target.value })}
+                    className="w-full bg-[#141414] text-white px-4 py-3.5 rounded-[14px] border border-white/10 focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48] outline-none transition-all placeholder:text-gray-600 text-sm shadow-inner"
+                    placeholder="e.g. 25"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-300 mb-1.5 ml-1 tracking-wide uppercase">Weight (kg)</label>
+                  <input
+                    type="number"
+                    value={formData.weight}
+                    onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
+                    className="w-full bg-[#141414] text-white px-4 py-3.5 rounded-[14px] border border-white/10 focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48] outline-none transition-all placeholder:text-gray-600 text-sm shadow-inner"
+                    placeholder="e.g. 65"
+                    required
+                  />
+                </div>
+              </div>
+            )}
 
             {/* State Select Dropdown */}
             <div>
