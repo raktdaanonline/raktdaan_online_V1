@@ -43,8 +43,30 @@ const OrganizerEnquiry = () => {
     setForm((p) => ({ ...p, [name]: value }));
   };
 
+  const isStepValid = () => {
+    if (currentStep === 1) {
+      return (
+        form.organizerName.trim() !== "" &&
+        form.phone.trim() !== "" &&
+        form.email.trim() !== ""
+      );
+    }
+    if (currentStep === 2) {
+      return form.organizationType !== "";
+    }
+    if (currentStep === 3) {
+      return (
+        form.preferredDate.trim() !== "" &&
+        form.state.trim() !== "" &&
+        form.city.trim() !== "" &&
+        form.address.trim() !== ""
+      );
+    }
+    return true;
+  };
+
   const nextStep = () => {
-    if (currentStep < 4) setCurrentStep(currentStep + 1);
+    if (currentStep < 4 && isStepValid()) setCurrentStep(currentStep + 1);
   };
 
   const prevStep = () => {
@@ -53,6 +75,7 @@ const OrganizerEnquiry = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isStepValid()) return;
     setLoading(true);
     setSuccessMsg("");
     setErrorMsg("");
@@ -256,22 +279,22 @@ const OrganizerEnquiry = () => {
                      Tell us about your<br/><span className="text-red-500">organization</span>
                   </h3>
                   <div className="mb-6">
-                    <label className="text-zinc-400 text-xs font-bold mb-3 block pl-1">Organization Type *</label>
-                    <div className="flex flex-wrap gap-3">
-                      {['Personal', 'College', 'Corporate', 'NGO', 'Society'].map(type => (
-                        <button
-                          key={type} type="button"
-                          onClick={() => handleSelect('organizationType', type)}
-                          className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
-                            form.organizationType === type 
-                            ? 'bg-red-600/20 text-red-500 border border-red-500/50 shadow-[0_0_15px_rgba(220,38,38,0.15)]' 
-                            : 'bg-zinc-900/30 text-zinc-400 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
+                     <label className="text-zinc-400 text-xs font-bold mb-3 block pl-1">Organization Type *</label>
+                     <div className="flex flex-wrap gap-3">
+                       {['Personal', 'College', 'Corporate', 'NGO', 'Society'].map(type => (
+                         <button
+                           key={type} type="button"
+                           onClick={() => handleSelect('organizationType', type)}
+                           className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                             form.organizationType === type 
+                             ? 'bg-red-600/20 text-red-500 border border-red-500/50 shadow-[0_0_15px_rgba(220,38,38,0.15)]' 
+                             : 'bg-zinc-900/30 text-zinc-400 border border-zinc-800 hover:bg-zinc-800/80 hover:text-white'
+                           }`}
+                         >
+                           {type}
+                         </button>
+                       ))}
+                     </div>
                   </div>
 
                   <div className="relative mt-6">
@@ -438,7 +461,8 @@ const OrganizerEnquiry = () => {
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 rounded-xl text-white font-bold text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all hover:-translate-y-0.5"
+                  disabled={!isStepValid()}
+                  className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 rounded-xl text-white font-bold text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all hover:-translate-y-0.5 disabled:opacity-30 disabled:cursor-not-allowed disabled:pointer-events-none"
                 >
                   Next Step <ArrowRight className="w-4 h-4" />
                 </button>
@@ -446,8 +470,8 @@ const OrganizerEnquiry = () => {
                 <button
                   type="button"
                   onClick={handleSubmit}
-                  disabled={loading}
-                  className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 rounded-xl text-white font-bold text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                  disabled={loading || !isStepValid()}
+                  className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-red-700 to-red-600 hover:from-red-600 hover:to-red-500 rounded-xl text-white font-bold text-sm shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? "Submitting..." : "Submit Enquiry"} <ArrowRight className="w-4 h-4" />
                 </button>

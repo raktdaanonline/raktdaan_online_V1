@@ -125,52 +125,52 @@ const Registrations = () => {
       
       {/* SIDEBAR */}
       <aside className="hidden md:flex w-64 bg-[#1C1C28] text-gray-300 flex-col h-screen fixed top-0 left-0 z-40">
-        <div className="p-6 pb-2">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-red-500 rounded-full p-2"><Droplet className="w-5 h-5 text-white" /></div>
+        <div className="p-5 pb-2">
+          <div className="flex items-center gap-2.5 mb-6">
+            <div className="bg-red-500 rounded-full p-1.5"><Droplet className="w-4 h-4 text-white" /></div>
             <div>
-              <h1 className="text-white font-bold text-xl leading-tight">Raktdaan</h1>
-              <p className="text-xs text-gray-400">Organizer Panel</p>
+              <h1 className="text-white font-bold text-lg leading-tight">Raktdaan</h1>
+              <p className="text-[10px] text-gray-400">Organizer Panel</p>
             </div>
           </div>
           <WAStatus />
-          <p className="text-xs font-semibold tracking-wider text-gray-500 mb-4 px-2 mt-6">MAIN</p>
+          <p className="text-[10px] font-semibold tracking-wider text-gray-500 mb-3 px-2 mt-4">MAIN</p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
-          <Link to="/organizer-dashboard/dashboard" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-gray-400 hover:text-white hover:bg-white/5">
-            <LayoutDashboard className="w-5 h-5" /> Dashboard
+        <nav className="flex-1 px-3 space-y-1">
+          <Link to="/organizer-dashboard/dashboard" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+            <LayoutDashboard className="w-4 h-4" /> Dashboard
           </Link>
-          <Link to="/organizer-dashboard/my-camps" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-gray-400 hover:text-white hover:bg-white/5">
-            <Tent className="w-5 h-5" /> My Camps
+          <Link to="/organizer-dashboard/my-camps" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+            <Tent className="w-4 h-4" /> My Camps
           </Link>
-          <Link to="/organizer-dashboard/registrations" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition bg-[#E74C3C] text-white shadow-sm">
-            <Users className="w-5 h-5" /> Registrations
+          <Link to="/organizer-dashboard/registrations" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition bg-[#E74C3C] text-white shadow-sm">
+            <Users className="w-4 h-4" /> Registrations
           </Link>
-          <Link to="/organizer-dashboard/reports" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-gray-400 hover:text-white hover:bg-white/5">
-            <FileText className="w-5 h-5" /> Reports
+          <Link to="/organizer-dashboard/reports" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+            <FileText className="w-4 h-4" /> Reports
           </Link>
-          <Link to="/organizer-dashboard/gallery" className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition text-gray-400 hover:text-white hover:bg-white/5">
-            <Image className="w-5 h-5" /> Gallery
+          <Link to="/organizer-dashboard/gallery" className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-medium text-sm transition text-gray-400 hover:text-white hover:bg-white/5">
+            <Image className="w-4 h-4" /> Gallery
           </Link>
         </nav>
 
-        <div className="p-4 border-t border-white/10 mt-auto">
-          <Link to="/organizer/change-password" className="w-full flex items-center gap-3 hover:bg-white/5 p-3 rounded-xl transition text-gray-400 hover:text-white mb-2">
-            <KeyRound className="w-5 h-5" />
+        <div className="p-3 border-t border-white/10 mt-auto">
+          <Link to="/organizer/change-password" className="w-full flex items-center gap-2.5 hover:bg-white/5 px-3 py-2 rounded-xl transition text-gray-400 hover:text-white text-sm mb-1.5">
+            <KeyRound className="w-4 h-4" />
             <span className="font-medium">Change Password</span>
           </Link>
-          <button onClick={handleLogout} className="w-full flex items-center justify-between hover:bg-white/5 p-3 rounded-xl transition group">
-            <div className="flex items-center gap-3 text-left">
-              <div className="bg-red-500/20 text-red-500 font-bold w-10 h-10 rounded-full flex items-center justify-center">
+          <button onClick={handleLogout} className="w-full flex items-center justify-between hover:bg-white/5 px-3 py-2 rounded-xl transition group">
+            <div className="flex items-center gap-2.5 text-left">
+              <div className="bg-red-500/20 text-red-500 font-bold w-8 h-8 rounded-full flex items-center justify-center text-xs">
                 {user.name ? user.name.charAt(0).toUpperCase() : 'O'}
               </div>
               <div>
-                <p className="text-white text-sm font-semibold truncate w-24">{user.name || 'Organizer'}</p>
-                <p className="text-xs text-gray-500">Personal</p>
+                <p className="text-white text-xs font-semibold truncate w-24">{user.name || 'Organizer'}</p>
+                <p className="text-[10px] text-gray-500">Personal</p>
               </div>
             </div>
-            <LogOut className="w-5 h-5 text-gray-500 group-hover:text-red-400 transition" />
+            <LogOut className="w-4 h-4 text-gray-500 group-hover:text-red-400 transition" />
           </button>
         </div>
       </aside>

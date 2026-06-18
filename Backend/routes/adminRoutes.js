@@ -105,19 +105,43 @@ router.delete("/organizers/:id", verifyToken, async (req, res) => {
 ====================================================== */
 router.get("/organizers", verifyToken, async (req, res) => {
   try {
-    // 1. Organizer.find() -> Sare organizers lao
-    // 2. .select("-password") -> Password mat bhejo (security)
-    // 3. .populate("camps") -> "camps" array ke IDs ko full camp data me convert karo
-    const organizers = await User.find({ role: "organizer" })
-      .select("-password")
-      .sort({ createdAt: -1 })
-      .lean();
+    const users = await User.find({ role: "organizer" }).select("-password").lean();
+    const orgs = await Organizer.find().select("-password").lean();
 
-    const camps = await Camp.find({ organizer: { $in: organizers.map(o => o._id) } }).lean();
+    const mergedMap = new Map();
+    for (const u of users) {
+      if (!u.email || u.email.toLowerCase() === "pune") continue; // Skip malformed emails
+      mergedMap.set(u.email.toLowerCase(), {
+        _id: u._id,
+        name: u.name,
+        email: u.email,
+        phone: u.mobile,
+        isActive: u.isActive,
+        createdAt: u.createdAt
+      });
+    }
+
+    for (const o of orgs) {
+      if (!o.email) continue;
+      // Remove trailing backslash if present (e.g. from malformed emails)
+      const cleanEmail = o.email.trim().replace(/\\+$/, "").toLowerCase();
+      mergedMap.set(cleanEmail, {
+        _id: o._id,
+        name: o.name,
+        email: cleanEmail,
+        phone: o.phone,
+        isActive: o.isActive,
+        createdAt: o.createdAt
+      });
+    }
+
+    const organizers = Array.from(mergedMap.values());
+    const orgIds = organizers.map(o => o._id);
+
+    const camps = await Camp.find({ organizer: { $in: orgIds } }).lean();
 
     const organizersWithCamps = organizers.map(org => {
       org.camps = camps.filter(c => c.organizer?.toString() === org._id.toString());
-      org.phone = org.mobile;
       return org;
     });
 
@@ -535,6 +559,52 @@ router.put("/enquiries/:id", verifyToken, async (req, res) => {
   }
 });
 
+/* ======================================================
+   ADMIN: GET AVAILABLE BLOOD BANKS FOR A CAMP DATE
+====================================================== */
+router.get("/blood-banks/available", verifyToken, async (req, res) => {
+  try {
+    const { campDate, excludeEnquiryId } = req.query;
+    if (!campDate) {
+      return res.status(400).json({ message: "campDate is required" });
+    }
+
+    const targetDate = new Date(campDate);
+    if (isNaN(targetDate.getTime())) {
+      return res.status(400).json({ message: "Invalid campDate format" });
+    }
+
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const query = {
+      assignedBloodBank: { $exists: true, $ne: null },
+      preferredDate: { $gte: startOfDay, $lte: endOfDay },
+      status: { $in: ["pending", "approved"] }
+    };
+
+    if (excludeEnquiryId) {
+      query._id = { $ne: excludeEnquiryId };
+    }
+
+    const assignedEnquiries = await OrganizerEnquiry.find(query).select("assignedBloodBank");
+    const unavailableBloodBankIds = assignedEnquiries.map(e => e.assignedBloodBank.toString());
+
+    const bloodBanks = await BloodBank.find({
+      status: { $in: ["approved", "active"] }
+    }).select("-password -passwordToken -passwordTokenExpiresAt");
+
+    const availableBloodBanks = bloodBanks.filter(bb => !unavailableBloodBankIds.includes(bb._id.toString()));
+
+    res.json({ success: true, data: availableBloodBanks });
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching available blood banks", error: err.message });
+  }
+});
+
 // ✅ ASSIGN BLOOD BANK TO ENQUIRY
 router.put("/enquiries/:id/assign-bloodbank", verifyToken, async (req, res) => {
   try {
@@ -550,9 +620,45 @@ router.put("/enquiries/:id/assign-bloodbank", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Enquiry not found" });
     }
 
+    // Check if the blood bank is already assigned to another active enquiry on the same preferredDate
+    if (enquiry.preferredDate) {
+      const startOfDay = new Date(enquiry.preferredDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(enquiry.preferredDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const conflictEnquiry = await OrganizerEnquiry.findOne({
+        _id: { $ne: id },
+        assignedBloodBank: bloodBankId,
+        preferredDate: { $gte: startOfDay, $lte: endOfDay },
+        status: { $in: ["pending", "approved"] }
+      });
+
+      if (conflictEnquiry) {
+        return res.status(409).json({ message: "Conflict: Blood bank already assigned for this date." });
+      }
+    }
+
+    // 🔥 Check 5-minute reassignment rule (only if already assigned and not rejected)
+    if (
+      enquiry.assignedBloodBank &&
+      enquiry.bloodBankStatus !== "none" &&
+      enquiry.bloodBankStatus !== "rejected"
+    ) {
+      const assignedAtTime = enquiry.bloodBankAssignedAt || enquiry.updatedAt;
+      const timeDiff = Date.now() - new Date(assignedAtTime).getTime();
+      const minutesPassed = timeDiff / (1000 * 60);
+      if (minutesPassed > 5) {
+        return res.status(400).json({
+          message: "Reassignment blocked. You can only change the assigned Blood Bank within 5 minutes of the initial assignment."
+        });
+      }
+    }
+
     enquiry.assignedBloodBank = bloodBankId;
     enquiry.bloodBankStatus = "pending";
     enquiry.resourcesConfirmed = false;
+    enquiry.bloodBankAssignedAt = new Date(); // Record assignment time!
     await enquiry.save();
 
     // Create Notification for the assigned Blood Bank

@@ -36,6 +36,7 @@ const organizerEnquirySchema = new mongoose.Schema({
   },
   bloodBankNotes: { type: String },
   bloodBankResponseAt: { type: Date },
+  bloodBankAssignedAt: { type: Date },
   resourcesConfirmed: { type: Boolean, default: false },
 }, { timestamps: true });
 

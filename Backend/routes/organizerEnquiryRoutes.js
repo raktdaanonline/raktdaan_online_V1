@@ -82,28 +82,71 @@ router.patch("/:id/approve", verifyToken, async (req, res) => {
     const hashedPassword = await bcrypt.hash(tempPassword, salt);
 
     // Create User account for Organizer
-    let organizer = await User.findOne({ $or: [{ email: enquiry.email }, { mobile: enquiry.phone }] });
+    let organizer = await User.findOne({ email: enquiry.email });
+    if (!organizer) {
+      organizer = await User.findOne({ mobile: enquiry.phone });
+    }
+
     let isExistingUser = false;
     if (!organizer) {
-      organizer = new User({
-        name: enquiry.organizerName,
-        email: enquiry.email,
-        mobile: enquiry.phone,
-        password: hashedPassword,
-        bloodGroup: "Unknown", // Required in User schema, set default
-        role: "organizer",
-        organizationType: enquiry.organizationType,
-        organizationName: enquiry.organizationName,
-        mustChangePassword: true
-      });
-      await organizer.save();
+      // Check if email or phone is already taken by any other user to avoid duplicate key crash
+      const emailExists = await User.findOne({ email: enquiry.email });
+      const phoneExists = await User.findOne({ mobile: enquiry.phone });
+
+      if (emailExists) {
+        organizer = emailExists;
+        isExistingUser = true;
+        organizer.role = "organizer";
+        organizer.password = hashedPassword;
+        organizer.mustChangePassword = true;
+        organizer.isActive = true;
+        await organizer.save();
+      } else if (phoneExists) {
+        organizer = phoneExists;
+        isExistingUser = true;
+        organizer.role = "organizer";
+        organizer.password = hashedPassword;
+        organizer.mustChangePassword = true;
+        organizer.isActive = true;
+        await organizer.save();
+      } else {
+        organizer = new User({
+          name: enquiry.organizerName,
+          email: enquiry.email,
+          mobile: enquiry.phone,
+          password: hashedPassword,
+          bloodGroup: "Unknown", // Required in User schema, set default
+          role: "organizer",
+          organizationType: enquiry.organizationType,
+          organizationName: enquiry.organizationName,
+          mustChangePassword: true,
+          isActive: true
+        });
+        await organizer.save();
+      }
     } else {
       isExistingUser = true;
       // If user exists, upgrade role and set new temp password
       organizer.role = "organizer";
       organizer.password = hashedPassword;
       organizer.mustChangePassword = true;
-      if (!organizer.email) organizer.email = enquiry.email; // Save email if missing
+      organizer.isActive = true;
+      
+      // Only set email if it's not set, and make sure it's not a duplicate
+      if (!organizer.email) {
+        const emailExists = await User.findOne({ email: enquiry.email });
+        if (!emailExists) {
+          organizer.email = enquiry.email;
+        }
+      }
+      
+      // Only set mobile if it's different, and make sure it's not a duplicate
+      if (organizer.mobile !== enquiry.phone) {
+        const phoneExists = await User.findOne({ mobile: enquiry.phone });
+        if (!phoneExists) {
+          organizer.mobile = enquiry.phone;
+        }
+      }
       await organizer.save();
     }
 

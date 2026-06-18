@@ -1,19 +1,9 @@
-import nodemailer from "nodemailer";
+import transporter from "../config/emailConfig.js";
 
 export const sendEmail = async ({ to, subject, html }) => {
   try {
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || "smtp.gmail.com",
-      port: process.env.SMTP_PORT || 587,
-      secure: false, // true for 465, false for other ports
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    });
-
     const mailOptions = {
-      from: process.env.MAIL_FROM || `"Raktdaan" <no-reply@raktdaan.com>`,
+      from: process.env.MAIL_FROM || `"Raktdaan" <${process.env.SMTP_USER}>`,
       to,
       subject,
       html,

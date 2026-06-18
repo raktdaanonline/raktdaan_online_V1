@@ -48,7 +48,29 @@ const daysUntil = (date) => {
 };
 
 const Admin = () => {
-  const [currentView, setCurrentView] = useState("dashboard"); // "dashboard" | "camps" | "users" | "enquiries" | "organizers"
+  const [currentView, _setCurrentView] = useState("dashboard"); // "dashboard" | "camps" | "users" | "enquiries" | "organizers"
+  const [viewHistory, setViewHistory] = useState(["dashboard"]);
+
+  const setCurrentView = (newView) => {
+    setViewHistory((prev) => {
+      if (prev[prev.length - 1] === newView) return prev;
+      return [...prev, newView];
+    });
+    _setCurrentView(newView);
+  };
+
+  const handleGoBack = () => {
+    if (viewHistory.length > 1) {
+      const newHistory = [...viewHistory];
+      newHistory.pop(); // remove current view
+      const prevView = newHistory[newHistory.length - 1];
+      setViewHistory(newHistory);
+      _setCurrentView(prevView);
+    } else {
+      navigate(-1);
+    }
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [donors, setDonors] = useState([]);
   const [camps, setCamps] = useState([]);
@@ -109,6 +131,7 @@ const Admin = () => {
   const [editingEnquiry, setEditingEnquiry] = useState(null);
   const [editEnquiryForm, setEditEnquiryForm] = useState({});
   const [approvedBloodBanks, setApprovedBloodBanks] = useState([]);
+  const [availableBloodBanksMap, setAvailableBloodBanksMap] = useState({});
   const [selectedBloodBankId, setSelectedBloodBankId] = useState({});
 
   // --- Organizers Page States ---
@@ -206,6 +229,33 @@ const Admin = () => {
     fetchBloodRequests();
     fetchTotalUsers();
   }, []);
+
+  const [timeTicker, setTimeTicker] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setTimeTicker(Date.now()), 1000); // update every 1 second (live tick)
+    return () => clearInterval(timer);
+  }, []);
+
+  const canReassign = (enquiry) => {
+    if (!enquiry.assignedBloodBank) return true;
+    if (enquiry.bloodBankStatus === "accepted") return false; // Cannot reassign if already accepted!
+    if (enquiry.bloodBankStatus === "none" || enquiry.bloodBankStatus === "rejected") return true;
+    const assignedTime = enquiry.bloodBankAssignedAt || enquiry.updatedAt;
+    if (!assignedTime) return true;
+    const timeDiff = timeTicker - new Date(assignedTime).getTime();
+    const minutesPassed = timeDiff / (1000 * 60);
+    return minutesPassed <= 5;
+  };
+
+  const getRemainingTime = (assignedAt, updatedAt) => {
+    const assignedTime = assignedAt || updatedAt;
+    if (!assignedTime) return "0:00";
+    const timeDiff = timeTicker - new Date(assignedTime).getTime();
+    const secondsRemaining = Math.max(0, 300 - Math.floor(timeDiff / 1000));
+    const mins = Math.floor(secondsRemaining / 60);
+    const secs = secondsRemaining % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   const fetchTotalUsers = async () => {
     try {
@@ -323,12 +373,34 @@ const Admin = () => {
     setLoadingEnquiries(true);
     try {
       const data = await adminService.getEnquiries();
-      setEnquiries(Array.isArray(data) ? data : []);
-      
-      const bbData = await adminService.getBloodBanks({ status: "approved" });
+      const enquiriesList = Array.isArray(data) ? data : [];
+      setEnquiries(enquiriesList);
+
+      const bbData = await adminService.getBloodBanks();
+      let activeOrApproved = [];
       if (bbData && bbData.success) {
-        setApprovedBloodBanks(bbData.data);
+        activeOrApproved = bbData.data.filter(bb => bb.status === "approved" || bb.status === "active");
+        setApprovedBloodBanks(activeOrApproved);
       }
+
+      // Fetch available blood banks for each enquiry on its camp date
+      const availMap = {};
+      await Promise.all(
+        enquiriesList.map(async (enq) => {
+          if (enq.preferredDate) {
+            try {
+              const dateStr = enq.preferredDate.split("T")[0];
+              const res = await adminService.getAvailableBloodBanks(dateStr, enq._id);
+              if (res.success) {
+                availMap[enq._id] = res.data;
+              }
+            } catch (err) {
+              console.error("Failed to fetch available blood banks for enquiry", enq._id, err);
+            }
+          }
+        })
+      );
+      setAvailableBloodBanksMap(availMap);
     } catch (err) {
       console.error("Failed to load enquiries", err);
     } finally {
@@ -345,7 +417,7 @@ const Admin = () => {
     try {
       const res = await adminService.assignBloodBank(enquiryId, bloodBankId);
       toast.success(res.message || "Blood Bank assigned successfully!");
-      setEnquiries(prev => prev.map(e => e._id === enquiryId ? res.enquiry : e));
+      fetchEnquiries();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to assign blood bank.");
     }
@@ -837,14 +909,14 @@ const Admin = () => {
   const handleCampPhotosUpload = async (e) => {
     e.preventDefault();
     if (!campPhotosFiles || campPhotosFiles.length === 0) return toast.error("Please select at least one photo");
-    
+
     setUploadingPhotos(true);
     try {
       const formData = new FormData();
       Array.from(campPhotosFiles).forEach(file => {
         formData.append("photos", file);
       });
-      
+
       const res = await campService.uploadCampPhotos(photosCampId, formData);
       if (res.success) {
         toast.success("Photos uploaded successfully!");
@@ -1368,15 +1440,48 @@ const Admin = () => {
           font-weight: 600;
           color: #64748b;
         }
+        .copyright-footer {
+          text-align: center;
+          padding: 1.5rem 2rem;
+          font-size: 0.8rem;
+          color: #64748b;
+          border-top: 1px solid #e2e8f0;
+          margin-top: auto;
+          background-color: #ffffff;
+          font-weight: 500;
+        }
       `}</style>
       {/* 1. Left Sidebar Navigation */}
       <aside className={`sidebar ${!isSidebarOpen ? 'collapsed' : ''}`} data-lenis-prevent="true">
-        <div className="brand-container">
-          <div className="brand-logo" title="LifeDrop">🩸</div>
-          <div>
-            <div className="brand-name">Life<span>Drop</span></div>
-            <div className="brand-subtitle">Admin Panel</div>
-          </div>
+        <div className="brand-container" style={{ display: "flex", justifyContent: isSidebarOpen ? "space-between" : "center", alignItems: "center", width: "100%", marginBottom: "2rem" }}>
+          {isSidebarOpen && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div className="brand-logo" title="LifeDrop">🩸</div>
+              <div>
+                <div className="brand-name">Life<span>Drop</span></div>
+                <div className="brand-subtitle">Admin Panel</div>
+              </div>
+            </div>
+          )}
+          <button 
+            className="toggle-sidebar-btn-sidebar" 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            title="Toggle Sidebar"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#cbd5e1",
+              fontSize: "1.25rem",
+              cursor: "pointer",
+              padding: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "0.375rem"
+            }}
+          >
+            ☰
+          </button>
         </div>
 
         <div className="menu-section">
@@ -1428,20 +1533,7 @@ const Admin = () => {
             <span className="menu-item-icon">🩸</span> <span className="menu-item-text">Blood Requests</span>
           </button>
 
-          <button
-            className={`menu-item ${currentView === "blood-bank-requests" ? "active" : ""}`}
-            onClick={() => setCurrentView("blood-bank-requests")}
-            title="Blood Bank Requests"
-          >
-            <span className="menu-item-icon">🏥</span> <span className="menu-item-text">Blood Bank Requests</span>
-          </button>
-          <button
-            className={`menu-item ${currentView === "blood-banks" ? "active" : ""}`}
-            onClick={() => setCurrentView("blood-banks")}
-            title="Blood Banks"
-          >
-            <span className="menu-item-icon">🏨</span> <span className="menu-item-text">Blood Banks</span>
-          </button>
+
           <button
             className={`menu-item ${currentView === "organizers" ? "active" : ""}`}
             onClick={() => setCurrentView("organizers")}
@@ -1510,9 +1602,21 @@ const Admin = () => {
       <main className="main-content" data-lenis-prevent="true">
         {/* Top Header Bar */}
         <header className="top-header">
-          <div className="header-left">
-            <button className="toggle-sidebar-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-              {isSidebarOpen ? '🡨' : '☰'}
+          <div className="header-left" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button 
+              className="btn btn-sm btn-outline-danger d-flex align-items-center gap-2" 
+              onClick={handleGoBack}
+              title="Go Back"
+              style={{
+                borderRadius: "8px",
+                padding: "0.4rem 0.85rem",
+                fontSize: "0.85rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+            >
+              ← Go Back
             </button>
           </div>
 
@@ -1541,8 +1645,8 @@ const Admin = () => {
             </div>
 
             <div className="stats-grid">
-              <div 
-                className="stat-card" 
+              <div
+                className="stat-card"
                 onClick={() => setCurrentView("all-users")}
                 style={{ cursor: "pointer" }}
               >
@@ -1735,20 +1839,20 @@ const Admin = () => {
                             </span>
                           </td>
                           <td>
-                              <div className="d-flex flex-wrap gap-2">
-                                <button
-                                  className="btn btn-outline-danger btn-sm"
-                                  onClick={() => {
-                                    setSelectedCamp(camp._id);
-                                    setCurrentView("users");
-                                  }}
-                                >
-                                  View Donors
-                                </button>
-                                <button className="btn btn-sm btn-light border" onClick={() => handleManagePhotosClick(camp)} title="Manage Photos">📸</button>
-                                <button className="btn btn-sm btn-light border" onClick={() => handleEditCampClick(camp)} title="Edit Camp">✏️</button>
-                                <button className="btn btn-sm btn-light border text-danger" onClick={() => handleDeleteCamp(camp._id)} title="Delete Camp">🗑️</button>
-                                <button
+                            <div className="d-flex flex-wrap gap-2">
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => {
+                                  setSelectedCamp(camp._id);
+                                  setCurrentView("users");
+                                }}
+                              >
+                                View Donors
+                              </button>
+                              <button className="btn btn-sm btn-light border" onClick={() => handleManagePhotosClick(camp)} title="Manage Photos">📸</button>
+                              <button className="btn btn-sm btn-light border" onClick={() => handleEditCampClick(camp)} title="Edit Camp">✏️</button>
+                              <button className="btn btn-sm btn-light border text-danger" onClick={() => handleDeleteCamp(camp._id)} title="Delete Camp">🗑️</button>
+                              <button
                                 className="btn btn-sm btn-primary"
                                 onClick={() => {
                                   if (past) return;
@@ -1827,7 +1931,7 @@ const Admin = () => {
                     </div>
                     <div className="modal-body">
                       <p className="text-muted small mb-4">Camp: <strong>{photosCampObj.name || photosCampObj.title}</strong></p>
-                      
+
                       {/* Existing Photos Grid */}
                       <h6 className="fw-bold mb-3">Uploaded Photos ({photosCampObj.photos?.length || 0})</h6>
                       {photosCampObj.photos && photosCampObj.photos.length > 0 ? (
@@ -1844,10 +1948,10 @@ const Admin = () => {
                       <div className="p-4 bg-light rounded-3 border">
                         <h6 className="fw-bold mb-3">Upload New Photos</h6>
                         <form onSubmit={handleCampPhotosUpload}>
-                          <input 
-                            type="file" 
-                            className="form-control mb-3" 
-                            multiple 
+                          <input
+                            type="file"
+                            className="form-control mb-3"
+                            multiple
                             accept="image/*"
                             onChange={(e) => setCampPhotosFiles(e.target.files)}
                             disabled={uploadingPhotos}
@@ -1915,11 +2019,10 @@ const Admin = () => {
                         <td>{user.totalDonations || 0}</td>
                         <td>
                           {user.role === "donor" ? (
-                            <span className={`badge ${
-                              user.donationEligibilityStatus === "Eligible to Donate" 
-                                ? "bg-success" 
+                            <span className={`badge ${user.donationEligibilityStatus === "Eligible to Donate"
+                                ? "bg-success"
                                 : "bg-warning text-dark"
-                            }`}>
+                              }`}>
                               {user.donationEligibilityStatus || "Eligible"}
                             </span>
                           ) : (
@@ -1929,14 +2032,14 @@ const Admin = () => {
                         <td>
                           {user.role === "donor" && user.nextEligibleDonationDate
                             ? new Date(user.nextEligibleDonationDate).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
                             : "-"}
                         </td>
                         <td>
-                          {user.role === "donor" 
+                          {user.role === "donor"
                             ? (user.daysRemaining > 0 ? `${user.daysRemaining} days` : "0 days")
                             : "-"}
                         </td>
@@ -2178,96 +2281,134 @@ const Admin = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredEnquiries.map((e) => (
-                      <tr key={e._id}>
-                        <td>
-                          <div className="fw-bold text-danger">{e.organizationName || "N/A"}</div>
-                          <div className="fw-semibold text-dark">{e.organizerName}</div>
-                          <div className="small text-muted">📧 {e.email}</div>
-                          <div className="small text-muted">📞 {e.phone}</div>
-                          <div className="small text-secondary mt-1">Type: {e.organizationType}</div>
-                        </td>
-                        <td>
-                          <div className="small fw-semibold text-dark">
-                            📅 {e.preferredDate ? new Date(e.preferredDate).toLocaleDateString() : "TBA"}
-                            {e.preferredTime ? ` (${e.preferredTime})` : ""}
-                          </div>
-                          <div className="small text-muted">📍 {e.area || "N/A"}</div>
-                          <div className="small text-muted mt-1">👥 {e.expectedDonors || "N/A"} Donors expected</div>
-                          {e.message && (
-                            <div className="small mt-2 p-1 bg-light border rounded text-secondary" style={{ maxWidth: "250px" }}>
-                              <strong>Msg:</strong> {e.message}
+                    {filteredEnquiries.map((e) => {
+                      const availableBBs = availableBloodBanksMap[e._id] || approvedBloodBanks;
+                      const isAssignedBBUnavailable = e.assignedBloodBank && availableBloodBanksMap[e._id] && !availableBloodBanksMap[e._id].some(bb => bb._id === e.assignedBloodBank._id);
+
+                      return (
+                        <tr key={e._id}>
+                          <td>
+                            <div className="fw-bold text-danger">{e.organizationName || "N/A"}</div>
+                            <div className="fw-semibold text-dark">{e.organizerName}</div>
+                            <div className="small text-muted">📧 {e.email}</div>
+                            <div className="small text-muted">📞 {e.phone}</div>
+                            <div className="small text-secondary mt-1">Type: {e.organizationType}</div>
+                          </td>
+                          <td>
+                            <div className="small fw-semibold text-dark">
+                              📅 {e.preferredDate ? new Date(e.preferredDate).toLocaleDateString() : "TBA"}
+                              {e.preferredTime ? ` (${e.preferredTime})` : ""}
                             </div>
-                          )}
-                        </td>
-                        <td>
-                          <div className="small text-muted">{new Date(e.createdAt).toLocaleDateString()}</div>
-                        </td>
-                        <td>
-                          <span
-                            className={`badge ${
-                              e.status === "pending"
-                                ? "bg-warning text-dark"
-                                : e.status === "approved"
-                                ? "bg-success"
-                                : "bg-secondary"
-                            }`}
-                          >
-                            {e.status.toUpperCase()}
-                          </span>
-                          {e.status === "rejected" && e.rejectionReason && (
-                            <div className="small text-danger mt-1" style={{ maxWidth: "150px" }}>
-                              <strong>Reason:</strong> {e.rejectionReason}
-                            </div>
-                          )}
-                        </td>
-                        <td>
-                          {e.status === "pending" ? (
-                            (e.bloodBankStatus === "none" || e.bloodBankStatus === "rejected") ? (
-                              <div className="d-flex flex-column gap-1">
-                                {e.bloodBankStatus === "rejected" && (
-                                  <div className="small text-danger mb-1">
-                                    ❌ Rejected by {e.assignedBloodBank?.name || "Blood Bank"}
-                                  </div>
-                                )}
-                                <select
-                                  className="form-select form-select-sm"
-                                  value={selectedBloodBankId[e._id] || ""}
-                                  onChange={(ev) => setSelectedBloodBankId({ ...selectedBloodBankId, [e._id]: ev.target.value })}
-                                >
-                                  <option value="">Select Blood Bank</option>
-                                  {approvedBloodBanks.map(bb => (
-                                    <option key={bb._id} value={bb._id}>{bb.name} ({bb.city})</option>
-                                  ))}
-                                </select>
-                                <button
-                                  className="btn btn-sm btn-outline-danger w-100"
-                                  onClick={() => handleAssignBloodBank(e._id)}
-                                >
-                                  {e.bloodBankStatus === "rejected" ? "Re-assign" : "Assign BB"}
-                                </button>
+                            <div className="small text-muted">📍 {e.area || "N/A"}</div>
+                            <div className="small text-muted mt-1">👥 {e.expectedDonors || "N/A"} Donors expected</div>
+                            {e.message && (
+                              <div className="small mt-2 p-1 bg-light border rounded text-secondary" style={{ maxWidth: "250px" }}>
+                                <strong>Msg:</strong> {e.message}
                               </div>
+                            )}
+                          </td>
+                          <td>
+                            <div className="small text-muted">{new Date(e.createdAt).toLocaleDateString()}</div>
+                          </td>
+                          <td>
+                            <span
+                              className={`badge ${e.status === "pending"
+                                  ? "bg-warning text-dark"
+                                  : e.status === "approved"
+                                    ? "bg-success"
+                                    : "bg-secondary"
+                                }`}
+                            >
+                              {e.status.toUpperCase()}
+                            </span>
+                            {e.status === "rejected" && e.rejectionReason && (
+                              <div className="small text-danger mt-1" style={{ maxWidth: "150px" }}>
+                                <strong>Reason:</strong> {e.rejectionReason}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {e.status === "pending" ? (
+                              (e.bloodBankStatus === "none" || e.bloodBankStatus === "rejected") ? (
+                                <div className="d-flex flex-column gap-1">
+                                  {e.bloodBankStatus === "rejected" && (
+                                    <div className="small text-danger mb-1">
+                                      ❌ Rejected by {e.assignedBloodBank?.name || "Blood Bank"}
+                                    </div>
+                                  )}
+                                  <select
+                                    className="form-select form-select-sm"
+                                    value={selectedBloodBankId[e._id] || ""}
+                                    onChange={(ev) => setSelectedBloodBankId({ ...selectedBloodBankId, [e._id]: ev.target.value })}
+                                  >
+                                    <option value="">Select Blood Bank</option>
+                                    {availableBBs.map(bb => (
+                                      <option key={bb._id} value={bb._id}>{bb.name} ({bb.city})</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    className="btn btn-sm btn-outline-danger w-100"
+                                    onClick={() => handleAssignBloodBank(e._id)}
+                                  >
+                                    {e.bloodBankStatus === "rejected" ? "Re-assign" : "Assign BB"}
+                                  </button>
+                                </div>
+                              ) : canReassign(e) ? (
+                                <div className="d-flex flex-column gap-1">
+                                  <div className="fw-semibold small text-dark">
+                                    Assigned: {e.assignedBloodBank?.name}
+                                  </div>
+                                  {isAssignedBBUnavailable && (
+                                    <div className="text-danger small font-bold" style={{ fontSize: "0.7rem" }}>
+                                      ⚠️ Assigned to another camp on this date!
+                                    </div>
+                                  )}
+                                  <div className="text-warning font-bold" style={{ fontSize: "0.75rem" }}>
+                                    ⏱️ Change: {getRemainingTime(e.bloodBankAssignedAt, e.updatedAt)} remaining
+                                  </div>
+                                  <select
+                                    className="form-select form-select-sm"
+                                    value={selectedBloodBankId[e._id] || ""}
+                                    onChange={(ev) => setSelectedBloodBankId({ ...selectedBloodBankId, [e._id]: ev.target.value })}
+                                  >
+                                    <option value="">Change Blood Bank</option>
+                                    {availableBBs.map(bb => (
+                                      <option key={bb._id} value={bb._id}>{bb.name} ({bb.city})</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    className="btn btn-sm btn-warning w-100 text-dark font-bold"
+                                    onClick={() => handleAssignBloodBank(e._id)}
+                                  >
+                                    Reassign BB
+                                  </button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="fw-semibold small text-dark">{e.assignedBloodBank?.name}</div>
+                                  {isAssignedBBUnavailable && (
+                                    <div className="text-danger small font-bold mt-1" style={{ fontSize: "0.7rem" }}>
+                                      ⚠️ Assigned to another camp on this date!
+                                    </div>
+                                  )}
+                                  {e.bloodBankStatus === "pending" && (
+                                    <span className="badge bg-warning text-dark mt-1">Pending BB Response</span>
+                                  )}
+                                  {e.bloodBankStatus === "accepted" && (
+                                    <span className="badge bg-success mt-1">Confirmed (Resources OK)</span>
+                                  )}
+                                  {e.bloodBankNotes && (
+                                    <div className="small text-muted mt-1" style={{ fontSize: "0.75rem" }}>
+                                      Note: {e.bloodBankNotes}
+                                    </div>
+                                  )}
+                                </div>
+                              )
                             ) : (
-                              <div>
-                                <div className="fw-semibold small text-dark">{e.assignedBloodBank?.name}</div>
-                                {e.bloodBankStatus === "pending" && (
-                                  <span className="badge bg-warning text-dark mt-1">Pending BB Response</span>
-                                )}
-                                {e.bloodBankStatus === "accepted" && (
-                                  <span className="badge bg-success mt-1">Confirmed (Resources OK)</span>
-                                )}
-                                {e.bloodBankNotes && (
-                                  <div className="small text-muted mt-1" style={{ fontSize: "0.75rem" }}>
-                                    Note: {e.bloodBankNotes}
-                                  </div>
-                                )}
+                              <div className="fw-semibold small text-dark">
+                                {e.assignedBloodBank?.name || "None Assigned"}
                               </div>
-                            )
-                          ) : (
-                            <div className="fw-semibold small text-dark">
-                              {e.assignedBloodBank?.name || "None Assigned"}
-                            </div>
-                          )}
+                            )}
                         </td>
                         <td>
                           {e.status === "pending" ? (
@@ -2336,7 +2477,8 @@ const Admin = () => {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>
@@ -2401,7 +2543,7 @@ const Admin = () => {
                       <div className="text-sm text-slate-600">
                         <span className="font-semibold text-slate-800">Requested by:</span> {req.recipient?.name} ({req.recipient?.mobile})
                       </div>
-                      
+
                       {req.acceptedBy && (
                         <div className="text-sm mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
                           <div className="font-semibold text-green-800 mb-1">Donor Details (Accepted)</div>
@@ -2450,12 +2592,11 @@ const Admin = () => {
                             }
                           }
                         }}
-                        className={`w-full p-2.5 rounded-lg border-2 font-bold text-sm outline-none cursor-pointer appearance-none ${
-                          req.status === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-400' :
-                          req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400' :
-                          req.status === 'accepted' ? 'border-purple-200 bg-purple-50 text-purple-700 focus:border-purple-400' :
-                          'border-green-200 bg-green-50 text-green-700 focus:border-green-400'
-                        }`}
+                        className={`w-full p-2.5 rounded-lg border-2 font-bold text-sm outline-none cursor-pointer appearance-none ${req.status === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-400' :
+                            req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400' :
+                              req.status === 'accepted' ? 'border-purple-200 bg-purple-50 text-purple-700 focus:border-purple-400' :
+                                'border-green-200 bg-green-50 text-green-700 focus:border-green-400'
+                          }`}
                       >
                         <option value="pending">⏳ Pending Review</option>
                         <option value="active">📡 Active (Notifying Donors/blood bank)</option>
@@ -2491,7 +2632,7 @@ const Admin = () => {
                 <table className="premium-table">
                   <thead>
                     <tr>
-                      <th>#</th>
+                      <th>ID</th>
                       <th>Name</th>
                       <th>Contact / Email</th>
                       <th>Status</th>
@@ -2503,7 +2644,7 @@ const Admin = () => {
                     {organizersList.length > 0 ? (
                       organizersList.map((org, index) => (
                         <tr key={org._id}>
-                          <td>{index + 1}</td>
+                          <td style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{org._id}</td>
                           <td>
                             {editOrganizerId === org._id ? (
                               <input
@@ -2640,22 +2781,11 @@ const Admin = () => {
           </div>
         )}
 
+
+
         <footer className="copyright-footer">
           © 2026 LifeDrop Admin Dashboard. All rights reserved.
         </footer>
-        {/* --- 9. Blood Bank Requests --- */}
-        {currentView === "blood-bank-requests" && (
-          <div className="fade-in">
-            <AdminBloodBankRequests />
-          </div>
-        )}
-
-        {/* --- 10. Blood Banks --- */}
-        {currentView === "blood-banks" && (
-          <div className="fade-in">
-            <AdminBloodBanks />
-          </div>
-        )}
 
       </main>
 

@@ -2,6 +2,7 @@ import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import User from "../models/User.js";
+import Organizer from "../models/Organizer.js";
 import BloodRequest from "../models/BloodRequest.js";
 import { calculateDonationEligibility } from "../utils/badgeCalculator.js";
 
@@ -233,13 +234,17 @@ router.post("/organizer-login", async (req, res) => {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ success: false, message: "Please provide email and password" });
 
-    const user = await User.findOne({ email, role: "organizer" });
+    let user = await User.findOne({ email, role: "organizer" });
+    if (!user) {
+      user = await Organizer.findOne({ email });
+    }
+
     if (!user) return res.status(400).json({ success: false, message: "Invalid credentials or not an organizer" });
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ success: false, message: "Invalid credentials" });
 
-    const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET, { expiresIn: "7d" });
+    const token = jwt.sign({ id: user._id, role: "organizer" }, JWT_SECRET, { expiresIn: "7d" });
 
     res.status(200).json({
       success: true,
@@ -248,8 +253,8 @@ router.post("/organizer-login", async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role,
-        mustChangePassword: user.mustChangePassword
+        role: "organizer",
+        mustChangePassword: user.mustChangePassword || false
       }
     });
   } catch (error) {

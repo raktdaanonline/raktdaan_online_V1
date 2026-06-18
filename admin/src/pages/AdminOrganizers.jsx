@@ -105,11 +105,11 @@ const AdminOrganizers = () => {
           <table className="table table-hover table-bordered align-middle mb-0">
             <thead className="table-dark">
               <tr>
-                <th style={{ width: "5%" }}>#</th>
+                <th style={{ width: "15%" }}>ID</th>
                 <th style={{ width: "15%" }}>Name</th>
-                <th style={{ width: "20%" }}>Contact / Email</th>
+                <th style={{ width: "15%" }}>Contact / Email</th>
                 <th style={{ width: "10%" }}>Status</th>
-                <th style={{ width: "35%" }}>Assigned Camps Details</th>{" "}
+                <th style={{ width: "30%" }}>Assigned Camps Details</th>{" "}
                 {/* widened column */}
                 <th style={{ width: "15%" }}>Actions</th>
               </tr>
@@ -121,7 +121,7 @@ const AdminOrganizers = () => {
                     key={org._id}
                     className={!org.isActive ? "table-light text-muted" : ""}
                   >
-                    <td>{index + 1}</td>
+                    <td style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{org._id}</td>
 
                     {/* Name Field */}
                     <td>

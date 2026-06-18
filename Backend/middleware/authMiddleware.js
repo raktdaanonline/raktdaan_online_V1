@@ -20,7 +20,11 @@ export const verifyOrganizerToken = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "dev_secret_only");
     if (decoded.role !== "organizer") return res.status(403).json({ message: "Organizer only" });
 
-    const org = await User.findById(decoded.id);
+    let org = await User.findById(decoded.id);
+    if (!org) {
+      const { default: Organizer } = await import("../models/Organizer.js");
+      org = await Organizer.findById(decoded.id);
+    }
     if (!org || !org.isActive) return res.status(401).json({ message: "Organizer not found / inactive" });
 
     req.organizer = org;

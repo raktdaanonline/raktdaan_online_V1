@@ -422,8 +422,8 @@ router.put("/:id/approve", verifyToken, async (req, res) => {
       return res.status(404).json({ success: false, message: "Blood bank not found." });
     }
 
-    if (bloodBank.status !== "pending") {
-      return res.status(400).json({ success: false, message: "Status must be pending to approve." });
+    if (bloodBank.status !== "pending" && bloodBank.status !== "approved") {
+      return res.status(400).json({ success: false, message: "Status must be pending or approved to approve." });
     }
 
     const rawToken = generateToken();
@@ -820,6 +820,33 @@ router.put("/:id/status", verifyToken, async (req, res) => {
       updatedBy: req.admin.email || "Admin",
       updatedAt: new Date(),
     });
+
+    if (status === "approved" && oldStatus !== "approved") {
+      const rawToken = generateToken();
+      const hashed = hashToken(rawToken);
+      bloodBank.passwordToken = hashed;
+      bloodBank.passwordTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      bloodBank.verifiedBy = req.admin.id;
+      bloodBank.verifiedAt = new Date();
+      
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+      const setupLink = `${frontendUrl}/blood-bank/set-password?token=${rawToken}&email=${encodeURIComponent(bloodBank.email)}`;
+      
+      await sendEmail({
+        to: bloodBank.email,
+        subject: "Your Blood Bank Account Has Been Approved",
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #22c55e;">Account Approved!</h2>
+            <p>Hello ${bloodBank.managerName},</p>
+            <p>Congratulations! Your blood bank registration for <strong>${bloodBank.name}</strong> has been approved.</p>
+            <p>Please setup your secure login password using the link below:</p>
+            <p><a href="${setupLink}" style="display: inline-block; padding: 12px 24px; background-color: #22c55e; color: white; text-decoration: none; border-radius: 6px; font-weight: bold;">Set Password</a></p>
+            <p>This link is valid for 24 hours.</p>
+          </div>
+        `,
+      });
+    }
 
     if (status === "active") {
       bloodBank.isVerified = true;

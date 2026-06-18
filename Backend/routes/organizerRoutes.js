@@ -20,7 +20,11 @@ const router = express.Router();
 ====================================================== */
 router.get("/profile", verifyOrganizerToken, async (req, res) => {
   try {
-    const organizer = await User.findById(req.organizer._id).select("-password");
+    let organizer = await User.findById(req.organizer._id).select("-password");
+    if (!organizer) {
+      const { default: Organizer } = await import("../models/Organizer.js");
+      organizer = await Organizer.findById(req.organizer._id).select("-password");
+    }
     if (!organizer) {
       return res.status(404).json({ message: "Organizer not found" });
     }
@@ -416,7 +420,11 @@ router.get('/reports', verifyOrganizerToken, async (req, res) => {
 router.get('/whatsapp/status', verifyOrganizerToken, async (req, res) => {
   try {
     const organizerId = req.organizer._id.toString();
-    const organizer = await User.findById(organizerId);
+    let organizer = await User.findById(organizerId);
+    if (!organizer) {
+      const { default: Organizer } = await import("../models/Organizer.js");
+      organizer = await Organizer.findById(organizerId);
+    }
     
     if (!organizer) {
       return res.status(404).json({ success: false, message: 'Organizer not found' });

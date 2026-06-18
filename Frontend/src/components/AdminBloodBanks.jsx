@@ -213,7 +213,7 @@ export default function AdminBloodBanks() {
                 <th className="py-3 px-4 font-bold">Location</th>
                 <th className="py-3 px-4 font-bold">Expiry State</th>
                 <th className="py-3 px-4 font-bold">Status</th>
-                <th className="py-3 px-4 font-bold text-center">Actions</th>
+                <th className="py-3 px-4 font-bold">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -253,7 +253,7 @@ export default function AdminBloodBanks() {
                       )}
                     </td>
                     <td className="py-4 px-4">
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border uppercase tracking-wider ${
+                      <span className={`w-24 inline-block text-center py-0.5 text-[10px] font-bold rounded border uppercase tracking-wider ${
                         bank.status === 'active' ? 'bg-green-500/10 text-green-400 border-green-500/20' :
                         bank.status === 'pending' ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20' :
                         bank.status === 'suspended' ? 'bg-red-900/20 text-red-400 border-red-500/20' :
@@ -263,7 +263,7 @@ export default function AdminBloodBanks() {
                         {bank.status}
                       </span>
                     </td>
-                    <td className="py-4 px-4 flex justify-center gap-2">
+                    <td className="py-4 px-4 flex justify-start items-center gap-2">
                       <button
                         onClick={() => setSelectedBank(bank)}
                         className="flex items-center gap-1 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded text-xs font-bold transition-all border border-zinc-700 cursor-pointer"
