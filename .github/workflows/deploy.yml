@@ -66,23 +66,17 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
           script: |
-            cd /home/ubuntu/blood-Donation
-
+            cd /var/www/raktdaan_online_V1
             # Pull latest code
             git pull origin main
-
             # Pull latest images
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-backend:latest
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-frontend:latest
             docker pull ${{ secrets.DOCKER_USERNAME }}/raktdaan-admin:latest
-
-            # Restart all services
-            docker compose up -d --no-build backend frontend admin nginx
-
-            # Reload nginx
-            docker compose exec nginx nginx -s reload
-
+            # Restart all services with fresh images
+            docker compose up -d --force-recreate --no-build backend frontend admin
+            # Reload gateway nginx
+            docker exec master-gateway nginx -s reload
             # Remove old images
             docker image prune -f
-
             echo "✅ Deployment complete!"
