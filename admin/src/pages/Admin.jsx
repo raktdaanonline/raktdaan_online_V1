@@ -1625,7 +1625,7 @@ const Admin = () => {
               <div className="user-avatar">👤</div>
               <div className="user-info">
                 <span className="user-name">Admin</span>
-                <span className="user-role">Super Admin</span>
+                {/* <span className="user-role">Super Admin</span> */}
               </div>
             </div>
           </div>

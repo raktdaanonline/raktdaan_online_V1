@@ -33,6 +33,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import CampRegistration from "./pages/public/CampRegistration";
 import BloodBanks from "./pages/BloodBanks";
 import ViewAllRequests from "./pages/ViewAllRequests";
+import PrivacyPolicy from "./pages/public/PrivacyPolicy";
 
 import OrganizerDashboard from "./pages/organizer/Dashboard";
 import CampDetail from "./pages/organizer/CampDetail";
@@ -98,13 +99,14 @@ const Layout = () => {
 
         <Route path="/register-camp" element={<DonorRegistration />} />
         <Route path="/register-camp/:campName" element={<DonorRegistration />} />
-        <Route path="/camps/:campId" element={<CampRegistration />} />
         <Route path="/blood-banks" element={<BloodBanks />} />
-
-        {/* Firebase Auth flow */}     
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />     
         <Route path="/register" element={<OtpRegister />} />
         <Route path="/login" element={<OtpRegister />} />
         <Route path="/verify-otp" element={<OtpVerify />} />
+        <Route path="/camps/:campId" element={<CampRegistration />} />
+
+        {/* Firebase Auth flow */}     
         <Route path="/dashboard" element={<ProtectedRoute allowedRoles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/:tab" element={<ProtectedRoute allowedRoles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
         <Route path="/donor/dashboard" element={<ProtectedRoute allowedRoles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
