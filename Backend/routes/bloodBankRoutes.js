@@ -472,9 +472,7 @@ router.put("/requests/:requestId/accept", verifyBloodBank, async (req, res) => {
 router.get("/search", async (req, res) => {
   try {
     const { city, bloodGroup } = req.query;
-
-    const query = { status: "approved", isVerified: true };
-
+    const query = { status: { $in: ["approved", "active"] }, isVerified: true };
     if (city) {
       query.city = new RegExp(city, "i");
     }
@@ -523,9 +521,7 @@ router.get("/nearby", async (req, res) => {
     if (isNaN(userLat) || isNaN(userLng) || isNaN(radiusInMeters)) {
       return res.status(400).json({ success: false, message: "Invalid coordinates or radius" });
     }
-
-    const matchQuery = { status: "approved", isVerified: true };
-
+    const matchQuery = { status: { $in: ["approved", "active"] }, isVerified: true };
     if (bloodGroup && bloodGroup !== "All") {
       const validGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
       if (validGroups.includes(bloodGroup)) {

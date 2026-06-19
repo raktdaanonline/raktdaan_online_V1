@@ -75,12 +75,12 @@ const BloodBankSchema = new mongoose.Schema(
       default: "bloodbank",
     },
 
-    // Admin verification
     status: {
       type: String,
       enum: ['invited','pending','approved','rejected','active','suspended','blocked'],
       default: 'invited'
     },
+    isVerified: { type: Boolean, default: false },
     verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     verifiedAt: { type: Date },
     rejectionReason: { type: String },

@@ -1463,8 +1463,8 @@ const Admin = () => {
               </div>
             </div>
           )}
-          <button 
-            className="toggle-sidebar-btn-sidebar" 
+          <button
+            className="toggle-sidebar-btn-sidebar"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
             title="Toggle Sidebar"
             style={{
@@ -1603,8 +1603,8 @@ const Admin = () => {
         {/* Top Header Bar */}
         <header className="top-header">
           <div className="header-left" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <button 
-              className="btn btn-sm btn-outline-danger d-flex align-items-center gap-2" 
+            <button
+              className="btn btn-sm btn-outline-danger d-flex align-items-center gap-2"
               onClick={handleGoBack}
               title="Go Back"
               style={{
@@ -2020,8 +2020,8 @@ const Admin = () => {
                         <td>
                           {user.role === "donor" ? (
                             <span className={`badge ${user.donationEligibilityStatus === "Eligible to Donate"
-                                ? "bg-success"
-                                : "bg-warning text-dark"
+                              ? "bg-success"
+                              : "bg-warning text-dark"
                               }`}>
                               {user.donationEligibilityStatus || "Eligible"}
                             </span>
@@ -2313,10 +2313,10 @@ const Admin = () => {
                           <td>
                             <span
                               className={`badge ${e.status === "pending"
-                                  ? "bg-warning text-dark"
-                                  : e.status === "approved"
-                                    ? "bg-success"
-                                    : "bg-secondary"
+                                ? "bg-warning text-dark"
+                                : e.status === "approved"
+                                  ? "bg-success"
+                                  : "bg-secondary"
                                 }`}
                             >
                               {e.status.toUpperCase()}
@@ -2409,76 +2409,76 @@ const Admin = () => {
                                 {e.assignedBloodBank?.name || "None Assigned"}
                               </div>
                             )}
-                        </td>
-                        <td>
-                          {e.status === "pending" ? (
-                            <div className="d-flex flex-column gap-1">
-                              <div className="input-group input-group-sm">
-                                <span className="input-group-text bg-light text-muted small">PW</span>
-                                <input
-                                  className="form-control"
-                                  placeholder="Auto or Manual Password"
-                                  value={passwordById[e._id] || ""}
-                                  onChange={(ev) => setPasswordById({ ...passwordById, [e._id]: ev.target.value })}
-                                />
-                                <button
-                                  className="btn btn-success text-white"
-                                  onClick={() => approveEnquiry(e._id)}
-                                  disabled={e.bloodBankStatus !== "accepted"}
-                                  title={e.bloodBankStatus !== "accepted" ? "Awaiting Blood Bank Confirmation" : "Approve"}
-                                >
-                                  Approve
-                                </button>
+                          </td>
+                          <td>
+                            {e.status === "pending" ? (
+                              <div className="d-flex flex-column gap-1">
+                                <div className="input-group input-group-sm">
+                                  <span className="input-group-text bg-light text-muted small">PW</span>
+                                  <input
+                                    className="form-control"
+                                    placeholder="Auto or Manual Password"
+                                    value={passwordById[e._id] || ""}
+                                    onChange={(ev) => setPasswordById({ ...passwordById, [e._id]: ev.target.value })}
+                                  />
+                                  <button
+                                    className="btn btn-success text-white"
+                                    onClick={() => approveEnquiry(e._id)}
+                                    disabled={e.bloodBankStatus !== "accepted"}
+                                    title={e.bloodBankStatus !== "accepted" ? "Awaiting Blood Bank Confirmation" : "Approve"}
+                                  >
+                                    Approve
+                                  </button>
+                                </div>
+                                <div className="input-group input-group-sm">
+                                  <input
+                                    className="form-control"
+                                    placeholder="Rejection reason..."
+                                    value={rejectReasonById[e._id] || ""}
+                                    onChange={(ev) => setRejectReasonById({ ...rejectReasonById, [e._id]: ev.target.value })}
+                                  />
+                                  <button
+                                    className="btn btn-secondary"
+                                    onClick={() => rejectEnquiry(e._id)}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
                               </div>
-                              <div className="input-group input-group-sm">
-                                <input
-                                  className="form-control"
-                                  placeholder="Rejection reason..."
-                                  value={rejectReasonById[e._id] || ""}
-                                  onChange={(ev) => setRejectReasonById({ ...rejectReasonById, [e._id]: ev.target.value })}
-                                />
-                                <button
-                                  className="btn btn-secondary"
-                                  onClick={() => rejectEnquiry(e._id)}
-                                >
-                                  Reject
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-muted small">No pending action</span>
-                          )}
-                        </td>
-                        <td>
-                          <div className="d-flex flex-column gap-1" style={{ maxWidth: "100px" }}>
-                            {e.status === "approved" && (
-                              <button
-                                className="btn btn-sm btn-outline-warning w-100"
-                                onClick={() => {
-                                  setResetEnquiryModal(e);
-                                  setNewEnquiryPassword("");
-                                }}
-                              >
-                                🔑 Password
-                              </button>
+                            ) : (
+                              <span className="text-muted small">No pending action</span>
                             )}
-                            <button
-                              className="btn btn-sm btn-outline-primary w-100"
-                              onClick={() => openEditEnquiryModal(e)}
-                            >
-                              ✏️ Edit
-                            </button>
-                            <button
-                              className="btn btn-sm btn-outline-danger w-100"
-                              onClick={() => handleDeleteEnquiry(e._id)}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td>
+                            <div className="d-flex flex-column gap-1" style={{ maxWidth: "100px" }}>
+                              {e.status === "approved" && (
+                                <button
+                                  className="btn btn-sm btn-outline-warning w-100"
+                                  onClick={() => {
+                                    setResetEnquiryModal(e);
+                                    setNewEnquiryPassword("");
+                                  }}
+                                >
+                                  🔑 Password
+                                </button>
+                              )}
+                              <button
+                                className="btn btn-sm btn-outline-primary w-100"
+                                onClick={() => openEditEnquiryModal(e)}
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-danger w-100"
+                                onClick={() => handleDeleteEnquiry(e._id)}
+                              >
+                                🗑️ Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2593,9 +2593,9 @@ const Admin = () => {
                           }
                         }}
                         className={`w-full p-2.5 rounded-lg border-2 font-bold text-sm outline-none cursor-pointer appearance-none ${req.status === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-400' :
-                            req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400' :
-                              req.status === 'accepted' ? 'border-purple-200 bg-purple-50 text-purple-700 focus:border-purple-400' :
-                                'border-green-200 bg-green-50 text-green-700 focus:border-green-400'
+                          req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400' :
+                            req.status === 'accepted' ? 'border-purple-200 bg-purple-50 text-purple-700 focus:border-purple-400' :
+                              'border-green-200 bg-green-50 text-green-700 focus:border-green-400'
                           }`}
                       >
                         <option value="pending">⏳ Pending Review</option>
