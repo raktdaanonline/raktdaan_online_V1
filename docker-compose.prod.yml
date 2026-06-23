@@ -11,3 +11,7 @@ services:
   frontend:
     image: ${DOCKER_USERNAME}/raktdaan-frontend:latest
     build: !reset null
+
+  admin:
+    image: ${DOCKER_USERNAME}/raktdaan-admin:latest
+    build: !reset null
