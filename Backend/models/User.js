@@ -118,6 +118,14 @@ const userSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+userSchema.pre("validate", function(next) {
+  if (this.gender === "") this.gender = undefined;
+  if (this.health && this.health.gender === "") this.health.gender = undefined;
+  if (this.canTravelDistance === 0 || this.canTravelDistance === "") this.canTravelDistance = undefined;
+  if (this.preferredContactMethod === "") this.preferredContactMethod = undefined;
+  next();
+});
+
 userSchema.pre("save", function(next) {
   if (this.isModified("state") || this.isModified("normalizedState")) {
     this.normalizedState = normalizeLocation(this.state);
