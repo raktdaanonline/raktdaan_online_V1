@@ -176,6 +176,7 @@ const Dashboard = () => {
   };
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [showEditProfile, setShowEditProfile] = useState(false);
   const [profileData, setProfileData] = useState({
     name: "",
     bloodGroup: "O-",
@@ -186,7 +187,7 @@ const Dashboard = () => {
     latitude: "",
     longitude: "",
     availableForEmergency: true,
-    canTravelDistance: 5,
+    canTravelDistance: "5",
     preferredContactMethod: "Call",
     emergencyContactName: "",
     emergencyContactNumber: ""
@@ -221,21 +222,7 @@ const Dashboard = () => {
       };
       fetchUpcomingCamps();
 
-      setProfileData({
-        name: currentUser.name || "",
-        bloodGroup: currentUser.bloodGroup || "O-",
-        city: currentUser.city || "",
-        state: currentUser.state || "",
-        pincode: currentUser.pincode || "",
-        address: currentUser.address || "",
-        latitude: currentUser.latitude || "",
-        longitude: currentUser.longitude || "",
-        availableForEmergency: currentUser.availableForEmergency !== undefined ? currentUser.availableForEmergency : true,
-        canTravelDistance: currentUser.canTravelDistance || 5,
-        preferredContactMethod: currentUser.preferredContactMethod || "Call",
-        emergencyContactName: currentUser.emergencyContactName || "",
-        emergencyContactNumber: currentUser.emergencyContactNumber || ""
-      });
+      // profileData is initialized separately when the edit modal opens
 
       // Setup socket
       const socketUrl = import.meta.env.VITE_SOCKET_URL || "/";
@@ -401,9 +388,33 @@ const Dashboard = () => {
     }
   };
 
+
+  // Initialize form data fresh from currentUser ONLY when the modal opens
+  useEffect(() => {
+    if (showEditProfile && currentUser) {
+      setProfileData({
+        name: currentUser.name || "",
+        bloodGroup: currentUser.bloodGroup || "O-",
+        city: currentUser.city || "",
+        state: currentUser.state || "",
+        pincode: currentUser.pincode || "",
+        address: currentUser.address || "",
+        latitude: currentUser.latitude || "",
+        longitude: currentUser.longitude || "",
+        availableForEmergency: currentUser.availableForEmergency !== undefined ? currentUser.availableForEmergency : true,
+        canTravelDistance: String(currentUser.canTravelDistance || "5"),
+        preferredContactMethod: currentUser.preferredContactMethod || "Call",
+        emergencyContactName: currentUser.emergencyContactName || "",
+        emergencyContactNumber: currentUser.emergencyContactNumber || ""
+      });
+    }
+  }, [showEditProfile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleProfileChange = (e) => {
-    setProfileData({ ...profileData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setProfileData(prev => ({ ...prev, [name]: value }));
   };
+
 
   const handleLocationFetch = () => {
     if (!navigator.geolocation) {
@@ -426,21 +437,29 @@ const Dashboard = () => {
     );
   };
 
+
   const handleProfileSave = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     setIsSavingProfile(true);
     try {
       const res = await api.put("/auth/me", profileData);
       if (res.data.success) {
         toast.success("Profile updated successfully!");
-        setCurrentUser(res.data.user);
+        const updatedUser = res.data.user;
+        setCurrentUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
+        window.dispatchEvent(new Event("userUpdated"));
+        setShowEditProfile(false);
+        return Promise.resolve();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to update profile");
+      return Promise.reject(err);
     } finally {
       setIsSavingProfile(false);
     }
   };
+
 
   const renderContent = () => {
     switch (activeTab) {
@@ -456,14 +475,14 @@ const Dashboard = () => {
             <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 leading-tight">My Profile</h2>
-                <p className="text-sm text-gray-500 mt-1">Manage your basic profile, location and availability</p>
+                <p className="text-sm text-gray-500 mt-1">View your profile details and location information</p>
               </div>
               <button
-                onClick={handleProfileSave}
-                disabled={isSavingProfile}
-                className="px-6 py-2.5 bg-[#E74C3C] hover:bg-red-700 disabled:opacity-70 rounded-xl text-white font-medium transition-all shadow-sm flex items-center gap-2"
+                onClick={() => setShowEditProfile(true)}
+                className="px-6 py-2.5 bg-[#E74C3C] hover:bg-red-700 rounded-xl text-white font-semibold transition-all shadow-sm flex items-center gap-2"
               >
-                {isSavingProfile ? "Saving..." : "Save Changes"}
+                <Settings size={16} />
+                Edit Profile
               </button>
             </div>
 
@@ -491,130 +510,104 @@ const Dashboard = () => {
               </div>
             </div>
 
-            <form onSubmit={handleProfileSave} className="space-y-6">
-              {/* Basic Information */}
-              <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-900 mb-6 border-b border-gray-100 pb-3 flex items-center gap-2">
-                  <User size={18} className="text-red-500" /> Basic Information
+            {/* Profile Info View-Only Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Basic Info */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <User size={15} className="text-red-500" /> Basic Information
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Full Name *</label>
-                    <input required type="text" name="name" value={profileData.name} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Full Name</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.name || '—'}</span>
                   </div>
-                  <div>
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Blood Group *</label>
-                    <select required name="bloodGroup" value={profileData.bloodGroup} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500 appearance-none">
-                      <option value="">Select</option>
-                      <option value="A+">A+</option><option value="A-">A-</option>
-                      <option value="B+">B+</option><option value="B-">B-</option>
-                      <option value="AB+">AB+</option><option value="AB-">AB-</option>
-                      <option value="O+">O+</option><option value="O-">O-</option>
-                    </select>
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Blood Group</span>
+                    <span className="text-sm font-black text-red-600">{currentUser?.bloodGroup || '—'}</span>
                   </div>
-                  <div>
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 flex items-center justify-between">
-                      <span>Phone Number</span>
-                      <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded flex items-center gap-1"><Check size={10} /> Verified</span>
-                    </label>
-                    <input type="text" value={currentUser.mobile || ""} disabled className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-500 cursor-not-allowed" />
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Phone</span>
+                    <span className="text-sm font-semibold text-gray-800 flex items-center gap-1">
+                      +91 {currentUser?.mobile || '—'}
+                      <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-bold">✓ Verified</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Role</span>
+                    <span className="text-sm font-semibold text-gray-800 capitalize">{currentUser?.role || '—'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Location Details */}
-              <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
-                <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-3">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    <MapPin size={18} className="text-red-500" /> Location Details
-                  </h3>
-                  <button type="button" onClick={handleLocationFetch} className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
-                    <MapPin size={12} /> Use Current Location
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="md:col-span-2">
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Full Address</label>
-                    <input type="text" name="address" value={profileData.address} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
+              {/* Location Info */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <MapPin size={15} className="text-red-500" /> Location
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">City</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.city || '—'}</span>
                   </div>
-                  <div>
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">City *</label>
-                    <input required type="text" name="city" value={profileData.city} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">State</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.state || '—'}</span>
                   </div>
-                  <div>
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">State *</label>
-                    <input required type="text" name="state" value={profileData.state} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Pincode</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.pincode || '—'}</span>
                   </div>
-                  <div>
-                    <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Pincode</label>
-                    <input type="text" maxLength={6} name="pincode" value={profileData.pincode} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
-                  </div>
-                  <div className="flex gap-4">
-                    <div className="w-1/2">
-                      <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Latitude</label>
-                      <input type="text" value={profileData.latitude} disabled className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-500 text-xs cursor-not-allowed" />
-                    </div>
-                    <div className="w-1/2">
-                      <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Longitude</label>
-                      <input type="text" value={profileData.longitude} disabled className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-500 text-xs cursor-not-allowed" />
-                    </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Address</span>
+                    <span className="text-sm font-semibold text-gray-800 text-right max-w-[55%]">{currentUser?.address || '—'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Availability & Emergency */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 border-b border-gray-100 pb-3 flex items-center gap-2">
-                    <Clock size={18} className="text-red-500" /> Availability
-                  </h3>
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-gray-700">Available for Emergency</label>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" className="sr-only peer" checked={profileData.availableForEmergency} onChange={(e) => setProfileData({ ...profileData, availableForEmergency: e.target.checked })} />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
-                      </label>
-                    </div>
-                    <div>
-                      <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Can Travel Distance</label>
-                      <select name="canTravelDistance" value={profileData.canTravelDistance} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500 appearance-none">
-                        <option value={5}>Upto 5 km</option>
-                        <option value={10}>Upto 10 km</option>
-                        <option value={20}>Upto 20 km</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Preferred Contact Method</label>
-                      <select name="preferredContactMethod" value={profileData.preferredContactMethod} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500 appearance-none">
-                        <option value="Call">Call</option>
-                        <option value="WhatsApp">WhatsApp</option>
-                        <option value="SMS">SMS</option>
-                      </select>
-                    </div>
+              {/* Availability */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <Clock size={15} className="text-red-500" /> Availability
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Emergency Available</span>
+                    <span className={`text-xs font-bold px-3 py-1 rounded-full ${currentUser?.availableForEmergency !== false ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
+                      {currentUser?.availableForEmergency !== false ? 'Yes' : 'No'}
+                    </span>
                   </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-6 md:p-8 border border-gray-100 shadow-sm">
-                  <h3 className="text-lg font-bold text-gray-900 mb-6 border-b border-gray-100 pb-3 flex items-center gap-2">
-                    <AlertCircle size={18} className="text-red-500" /> Emergency Contact
-                  </h3>
-                  <div className="space-y-5">
-                    <div>
-                      <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Contact Name</label>
-                      <input type="text" name="emergencyContactName" value={profileData.emergencyContactName} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
-                    </div>
-                    <div>
-                      <label className="text-gray-500 text-xs font-semibold uppercase tracking-wide mb-2 block">Contact Number</label>
-                      <input type="text" maxLength={10} name="emergencyContactNumber" value={profileData.emergencyContactNumber} onChange={handleProfileChange} className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:border-red-500" />
-                    </div>
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Can Travel</span>
+                    <span className="text-sm font-semibold text-gray-800">Upto {currentUser?.canTravelDistance || 5} km</span>
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Contact Via</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.preferredContactMethod || 'Call'}</span>
                   </div>
                 </div>
               </div>
-            </form>
+
+              {/* Emergency Contact */}
+              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <AlertCircle size={15} className="text-red-500" /> Emergency Contact
+                </h3>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Contact Name</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.emergencyContactName || '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-3">
+                    <span className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Contact Number</span>
+                    <span className="text-sm font-semibold text-gray-800">{currentUser?.emergencyContactNumber || '—'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Health Summary Read-Only Card */}
-            <div className="bg-[#FFFDFB] rounded-2xl p-6 md:p-8 border-2 border-red-50 shadow-sm mt-8">
+            <div className="bg-[#FFFDFB] rounded-2xl p-6 md:p-8 border-2 border-red-50 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -653,6 +646,291 @@ const Dashboard = () => {
                 </div>
               )}
             </div>
+
+            {/* ── Edit Profile Popup Modal ── */}
+            {showEditProfile && (
+              <div style={{ position: 'fixed', inset: 0, zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+                {/* Backdrop */}
+                <div
+                  style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+                  onClick={() => setShowEditProfile(false)}
+                />
+                {/* Centered Popup — 80% wide */}
+                <div style={{ position: 'relative', width: '80%', maxHeight: '90vh', background: '#fff', borderRadius: '1.5rem', boxShadow: '0 25px 60px rgba(0,0,0,0.25)', display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'modal-in 0.25s cubic-bezier(0.34,1.56,0.64,1) both' }}>
+
+                  {/* Modal Header */}
+                  <div className="px-8 py-5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-white">
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                        <Settings size={20} className="text-red-500" /> Edit Profile
+                      </h2>
+                      <p className="text-xs text-gray-400 mt-0.5">Update your information and save changes</p>
+                    </div>
+                    <button
+                      onClick={() => setShowEditProfile(false)}
+                      className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-800 transition-colors text-2xl leading-none"
+                    >
+                      &times;
+                    </button>
+                  </div>
+
+                  {/* Scrollable Form Body */}
+                  <form
+                    onSubmit={handleProfileSave}
+                    className="flex-1 overflow-y-auto"
+                  >
+                    <div className="p-8 space-y-8">
+
+                      {/* Row 1: Basic Information */}
+                      <div>
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2 border-b border-gray-100 pb-3">
+                          <User size={13} className="text-red-500" /> Basic Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">
+                              Full Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              required
+                              type="text"
+                              name="name"
+                              value={profileData.name}
+                              onChange={handleProfileChange}
+                              placeholder="Your full name"
+                              autoComplete="off"
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">
+                              Blood Group <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              required
+                              name="bloodGroup"
+                              value={profileData.bloodGroup}
+                              onChange={handleProfileChange}
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                            >
+                              <option value="">Select Blood Group</option>
+                              <option value="A+">A+</option>
+                              <option value="A-">A-</option>
+                              <option value="B+">B+</option>
+                              <option value="B-">B-</option>
+                              <option value="AB+">AB+</option>
+                              <option value="AB-">AB-</option>
+                              <option value="O+">O+</option>
+                              <option value="O-">O-</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">Phone Number</label>
+                            <input
+                              type="text"
+                              value={`+91 ${currentUser?.mobile || ''}`}
+                              disabled
+                              className="w-full border border-gray-100 rounded-xl px-4 py-3 text-sm text-gray-400 bg-gray-50 cursor-not-allowed"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Row 2: Location */}
+                      <div>
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-5">
+                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                            <MapPin size={13} className="text-red-500" /> Location Details
+                          </h3>
+                          <button
+                            type="button"
+                            onClick={handleLocationFetch}
+                            className="text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                          >
+                            <MapPin size={11} /> Use GPS Location
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                          <div className="md:col-span-2">
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">Full Address</label>
+                            <input
+                              type="text"
+                              name="address"
+                              value={profileData.address}
+                              onChange={handleProfileChange}
+                              placeholder="House / Flat, Street, Area"
+                              autoComplete="off"
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">
+                              City <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              required
+                              type="text"
+                              name="city"
+                              value={profileData.city}
+                              onChange={handleProfileChange}
+                              placeholder="City"
+                              autoComplete="off"
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">
+                              State <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              required
+                              type="text"
+                              name="state"
+                              value={profileData.state}
+                              onChange={handleProfileChange}
+                              placeholder="State"
+                              autoComplete="off"
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-gray-600 mb-2">Pincode</label>
+                            <input
+                              type="text"
+                              name="pincode"
+                              maxLength={6}
+                              value={profileData.pincode}
+                              onChange={handleProfileChange}
+                              placeholder="6-digit pincode"
+                              autoComplete="off"
+                              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                            />
+                          </div>
+                          {(profileData.latitude || profileData.longitude) && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-2">Latitude</label>
+                                <input type="text" value={profileData.latitude} disabled className="w-full border border-gray-100 rounded-xl px-4 py-3 text-xs text-gray-400 bg-gray-50 cursor-not-allowed" />
+                              </div>
+                              <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-2">Longitude</label>
+                                <input type="text" value={profileData.longitude} disabled className="w-full border border-gray-100 rounded-xl px-4 py-3 text-xs text-gray-400 bg-gray-50 cursor-not-allowed" />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Row 3: Availability + Emergency Contact side by side */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        {/* Availability */}
+                        <div>
+                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <Clock size={13} className="text-red-500" /> Availability
+                          </h3>
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3">
+                              <span className="text-sm font-semibold text-gray-700">Available for Emergency</span>
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="sr-only peer"
+                                  checked={profileData.availableForEmergency}
+                                  onChange={(e) => setProfileData(prev => ({ ...prev, availableForEmergency: e.target.checked }))}
+                                />
+                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+                              </label>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-2">Can Travel Distance</label>
+                              <select
+                                name="canTravelDistance"
+                                value={profileData.canTravelDistance}
+                                onChange={handleProfileChange}
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                              >
+                                <option value="5">Upto 5 km</option>
+                                <option value="10">Upto 10 km</option>
+                                <option value="20">Upto 20 km</option>
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-2">Preferred Contact Method</label>
+                              <select
+                                name="preferredContactMethod"
+                                value={profileData.preferredContactMethod}
+                                onChange={handleProfileChange}
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                              >
+                                <option value="Call">Call</option>
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="SMS">SMS</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Emergency Contact */}
+                        <div>
+                          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 flex items-center gap-2 border-b border-gray-100 pb-3">
+                            <AlertCircle size={13} className="text-red-500" /> Emergency Contact
+                          </h3>
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-2">Contact Name</label>
+                              <input
+                                type="text"
+                                name="emergencyContactName"
+                                value={profileData.emergencyContactName}
+                                onChange={handleProfileChange}
+                                placeholder="Emergency contact name"
+                                autoComplete="off"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-semibold text-gray-600 mb-2">Contact Number</label>
+                              <input
+                                type="text"
+                                name="emergencyContactNumber"
+                                maxLength={10}
+                                value={profileData.emergencyContactNumber}
+                                onChange={handleProfileChange}
+                                placeholder="10-digit mobile number"
+                                autoComplete="off"
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition-all"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                    </div>
+
+                    {/* Sticky Footer Buttons */}
+                    <div className="sticky bottom-0 bg-white border-t border-gray-100 px-8 py-5 flex gap-4 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setShowEditProfile(false)}
+                        className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-semibold text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSavingProfile}
+                        className="flex-1 py-3 rounded-xl bg-[#E74C3C] hover:bg-red-700 disabled:opacity-60 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-md"
+                      >
+                        {isSavingProfile ? (
+                          <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
+                        ) : 'Save Changes'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+
 
           </div>
         );

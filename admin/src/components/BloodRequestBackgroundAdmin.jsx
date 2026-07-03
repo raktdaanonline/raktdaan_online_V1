@@ -142,7 +142,7 @@ const BloodRequestBackgroundAdmin = () => {
   return (
     <div className="chart-card p-4">
       <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2 className="text-danger fw-bold m-0">Blood Request Backgrounds</h2>
+        <h2 className="text-danger fw-bold m-0">Form Backgrounds</h2>
         <button className="btn btn-outline-secondary" onClick={fetchBackgrounds}>
           Refresh List
         </button>

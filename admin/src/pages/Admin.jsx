@@ -94,6 +94,10 @@ const Admin = () => {
   const [editDonorId, setEditDonorId] = useState(null);
   const [editForm, setEditForm] = useState({});
 
+  // Platform User Edit states
+  const [editPlatformUserId, setEditPlatformUserId] = useState(null);
+  const [editPlatformUserForm, setEditPlatformUserForm] = useState({});
+
   // Camp Edit states
   const [editCampId, setEditCampId] = useState(null);
   const [editCampForm, setEditCampForm] = useState({});
@@ -528,8 +532,10 @@ const Admin = () => {
 
   // --- Camps & Donors Logic ---
   useEffect(() => {
-    if (selectedCamp) fetchDonors();
-  }, [selectedCamp]);
+    if (selectedCamp && currentView === "users") {
+      fetchDonors();
+    }
+  }, [selectedCamp, currentView]);
 
   const fetchCamps = async () => {
     setLoadingCamps(true);
@@ -678,6 +684,43 @@ const Admin = () => {
     } catch (err) {
       console.error(err.response || err);
       toast.error(err?.response?.data?.message || "Error saving donor update");
+    }
+  };
+
+  // Platform User Edit & Delete methods
+  const handleEditPlatformUserClick = (user) => {
+    setEditPlatformUserId(user._id);
+    setEditPlatformUserForm({ ...user });
+  };
+
+  const handleEditPlatformUserChange = (e) => {
+    const { name, value } = e.target;
+    setEditPlatformUserForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditPlatformUserSave = async (id) => {
+    try {
+      await adminService.updateUser(id, editPlatformUserForm);
+      setAllUsers(prev =>
+        prev.map(u => u._id === id ? { ...u, ...editPlatformUserForm } : u)
+      );
+      setEditPlatformUserId(null);
+      toast.success("User updated successfully!");
+    } catch (err) {
+      console.error("Error saving user:", err.response || err);
+      toast.error(err?.response?.data?.message || "Error saving user update");
+    }
+  };
+
+  const handleDeletePlatformUser = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await adminService.deleteUser(id);
+      setAllUsers(prev => prev.filter(u => u._id !== id));
+      toast.success("User deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting user:", err.response || err);
+      toast.error(err?.response?.data?.message || "Error deleting user");
     }
   };
 
@@ -1512,8 +1555,8 @@ const Admin = () => {
             <span className="menu-item-icon">🏥</span> <span className="menu-item-text">Blood Banks</span>
           </button>
           <button
-            className={`menu-item ${currentView === "users" ? "active" : ""}`}
-            onClick={() => setCurrentView("users")}
+            className={`menu-item ${currentView === "all-users" ? "active" : ""}`}
+            onClick={() => setCurrentView("all-users")}
             title="Donors (Users)"
           >
             <span className="menu-item-icon">👥</span> <span className="menu-item-text">Donors (Users)</span>
@@ -1548,16 +1591,16 @@ const Admin = () => {
           <button
             className={`menu-item ${currentView === "uiux" ? "active" : ""}`}
             onClick={() => setCurrentView("uiux")}
-            title="UI/UX"
+            title="Hero Banner"
           >
-            <span className="menu-item-icon">🎨</span> <span className="menu-item-text">UI/UX</span>
+            <span className="menu-item-icon">🎨</span> <span className="menu-item-text">Hero Banner</span>
           </button>
           <button
             className={`menu-item ${currentView === "blood-request-background" ? "active" : ""}`}
             onClick={() => setCurrentView("blood-request-background")}
-            title="Blood Request Background"
+            title="Form Background"
           >
-            <span className="menu-item-icon">🖼️</span> <span className="menu-item-text">Blood Request Background</span>
+            <span className="menu-item-icon">🖼️</span> <span className="menu-item-text">Form Background</span>
           </button>
           <button
             className={`menu-item ${currentView === "impact-gallery" ? "active" : ""}`}
@@ -1594,7 +1637,7 @@ const Admin = () => {
         </div>
 
         <div className="emergency-button-container">
-          <button className="emergency-btn">🚨 Emergency Requests</button>
+          <button className="emergency-btn" onClick={() => setCurrentView("blood-requests")}>🚨 Emergency Requests</button>
         </div>
       </aside>
 
@@ -1691,7 +1734,7 @@ const Admin = () => {
               <div className="table-card">
                 <div className="table-header">
                   <h3 className="table-title">Live Blood Requests (Last 24 Hours)</h3>
-                  <button className="view-all-link" onClick={() => setCurrentView("dashboard")}>View All</button>
+                  <button className="view-all-link" onClick={() => setCurrentView("blood-requests")}>View All</button>
                 </div>
 
                 <div className="custom-table-container">
@@ -2001,24 +2044,100 @@ const Admin = () => {
                       <th>Eligibility</th>
                       <th>Next Eligible Date</th>
                       <th>Days Remaining</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {allUsers.map((user, idx) => (
                       <tr key={user._id}>
                         <td className="donor-table-id">#{idx + 1}</td>
-                        <td className="fw-bold">{user.name}</td>
                         <td>
-                          <span className={`status-badge ${user.role === "donor" ? "fulfilled" : user.role === "organizer" ? "active" : "pending"}`}>
-                            {user.role}
-                          </span>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="name"
+                              value={editPlatformUserForm.name || ""}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            <span className="fw-bold">{user.name}</span>
+                          )}
                         </td>
-                        <td><span className="donor-table-group">{user.bloodGroup || "-"}</span></td>
-                        <td>{user.city || "-"}</td>
-                        <td>{user.mobile || user.phone || "-"}</td>
-                        <td>{user.totalDonations || 0}</td>
                         <td>
-                          {user.role === "donor" ? (
+                          {editPlatformUserId === user._id ? (
+                            <select
+                              className="form-select form-select-sm"
+                              name="role"
+                              value={editPlatformUserForm.role || ""}
+                              onChange={handleEditPlatformUserChange}
+                            >
+                              {["donor", "recipient", "organizer", "admin", "blood_bank"].map((r) => (
+                                <option key={r} value={r}>{r}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`status-badge ${user.role === "donor" ? "fulfilled" : user.role === "organizer" ? "active" : "pending"}`}>
+                              {user.role}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <select
+                              className="form-select form-select-sm"
+                              name="bloodGroup"
+                              value={editPlatformUserForm.bloodGroup || ""}
+                              onChange={handleEditPlatformUserChange}
+                            >
+                              {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
+                                <option key={bg} value={bg}>{bg}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="donor-table-group">{user.bloodGroup || "-"}</span>
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="city"
+                              value={editPlatformUserForm.city || ""}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            user.city || "-"
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="mobile"
+                              value={editPlatformUserForm.mobile || ""}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            user.mobile || user.phone || "-"
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="totalDonations"
+                              type="number"
+                              value={editPlatformUserForm.totalDonations !== undefined ? editPlatformUserForm.totalDonations : 0}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            user.totalDonations || 0
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            "-"
+                          ) : user.role === "donor" ? (
                             <span className={`badge ${user.donationEligibilityStatus === "Eligible to Donate"
                               ? "bg-success"
                               : "bg-warning text-dark"
@@ -2030,7 +2149,9 @@ const Admin = () => {
                           )}
                         </td>
                         <td>
-                          {user.role === "donor" && user.nextEligibleDonationDate
+                          {editPlatformUserId === user._id ? (
+                            "-"
+                          ) : user.role === "donor" && user.nextEligibleDonationDate
                             ? new Date(user.nextEligibleDonationDate).toLocaleDateString("en-IN", {
                               day: "numeric",
                               month: "short",
@@ -2039,9 +2160,24 @@ const Admin = () => {
                             : "-"}
                         </td>
                         <td>
-                          {user.role === "donor"
+                          {editPlatformUserId === user._id ? (
+                            "-"
+                          ) : user.role === "donor"
                             ? (user.daysRemaining > 0 ? `${user.daysRemaining} days` : "0 days")
                             : "-"}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-success" onClick={() => handleEditPlatformUserSave(user._id)}>✓</button>
+                              <button className="btn btn-sm btn-secondary" onClick={() => setEditPlatformUserId(null)}>✕</button>
+                            </div>
+                          ) : (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditPlatformUserClick(user)}>✏️</button>
+                              <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeletePlatformUser(user._id)}>🗑️</button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}

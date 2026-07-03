@@ -106,7 +106,12 @@ const BloodRequestForm = () => {
   }, []);
 
   const bloodGroups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
-  const unitOptions = ["1", "2", "3", "4+"];
+  const unitOptions = [
+    { value: "1", label: "1 Unit", volume: "350-450 ml" },
+    { value: "2", label: "2 Units", volume: "700-900 ml" },
+    { value: "3", label: "3 Units", volume: "1050-1350 ml" },
+    { value: "4+", label: "4+ Units", volume: "1400 ml+" }
+  ];
   const urgencyOptions = [
     { value: "urgent", label: "🚨 Urgent", desc: "Need within 24 hours" },
     { value: "planned", label: "📅 Planned", desc: "Surgery/Planned requirement" }
@@ -389,23 +394,32 @@ const BloodRequestForm = () => {
           </div>
 
           {/* Units */}
-          <div className="md:col-span-1">
+          <div className="md:col-span-1 flex flex-col">
             <label className="block text-xs font-bold text-zinc-300 mb-2 uppercase tracking-wider">Units Needed *</label>
             <div className="grid grid-cols-4 gap-2">
               {unitOptions.map((unit) => (
                 <button
-                  key={unit}
+                  key={unit.value}
                   type="button"
-                  onClick={() => setFormData({ ...formData, unitsNeeded: unit })}
-                  className={`py-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
-                    formData.unitsNeeded === unit
-                      ? "bg-[#D85A30]/90 border-[#D85A30] text-white shadow-[0_0_15px_rgba(216,90,48,0.4)] backdrop-blur-md"
-                      : "bg-white/10 border-white/20 text-zinc-100 hover:border-[#D85A30]/80 hover:bg-white/20 hover:text-white"
+                  onClick={() => setFormData({ ...formData, unitsNeeded: unit.value })}
+                  className={`py-2 px-1 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
+                    formData.unitsNeeded === unit.value
+                      ? "bg-white/10 border-[#E24B4A] shadow-[0_0_15px_rgba(226,75,74,0.3)] backdrop-blur-md"
+                      : "bg-white/5 border-white/10 hover:border-[#E24B4A]/50 hover:bg-white/10"
                   }`}
                 >
-                  <Droplet size={10} fill={formData.unitsNeeded === unit ? "currentColor" : "none"} /> {unit}
+                  <div className="flex items-center gap-1">
+                    <Droplet size={10} className={formData.unitsNeeded === unit.value ? "text-[#E24B4A] fill-[#E24B4A]" : "text-[#E24B4A]"} />
+                    <span className={`text-[11px] font-bold whitespace-nowrap ${formData.unitsNeeded === unit.value ? "text-white" : "text-zinc-200"}`}>{unit.label}</span>
+                  </div>
+                  <span className="text-[9px] text-zinc-400 font-medium whitespace-nowrap">~ {unit.volume.replace(' ml', '')}</span>
                 </button>
               ))}
+            </div>
+            
+            <div className="mt-2.5 flex items-start gap-1.5 p-2 rounded-xl bg-white/5 border border-white/10 text-zinc-300 text-[10px] font-medium leading-tight">
+              <AlertCircle size={13} className="mt-0.5 shrink-0 opacity-80" />
+              <p>1 blood unit typically contains 350 ml or 450 ml, depending on collection bag size.</p>
             </div>
           </div>
 

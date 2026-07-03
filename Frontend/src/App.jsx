@@ -43,6 +43,7 @@ import Reports from "./pages/organizer/Reports";
 import ChangePassword from "./pages/organizer/ChangePassword";
 import OrganizerRoute from "./components/OrganizerRoute";
 import BloodBankRoute from "./components/BloodBankRoute";
+import BloodBankLayout from "./components/BloodBankLayout";
 
 import BloodBankRegister from "./pages/BloodBankRegister";
 import BloodBankLogin from "./pages/BloodBankLogin";
@@ -111,7 +112,7 @@ const Layout = () => {
         <Route path="/dashboard/:tab" element={<ProtectedRoute allowedRoles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
         <Route path="/donor/dashboard" element={<ProtectedRoute allowedRoles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
         <Route path="/donor/profile" element={<ProtectedRoute allowedRoles={["donor"]}><DonorDashboard /></ProtectedRoute>} />
-        <Route path="/recipient/profile" element={<Navigate to="/request-status/RD2026174" replace />} />
+        <Route path="/recipient/profile" element={<ProtectedRoute allowedRoles={["recipient", "donor"]}><RecipientProfile /></ProtectedRoute>} />
         <Route path="/blood-request" element={<BloodRequestForm />} />
         <Route path="/live-requests" element={<ViewAllRequests />} />
         <Route path="/request-status/:requestId" element={<RequestStatus />} />
@@ -134,16 +135,16 @@ const Layout = () => {
         <Route path="/blood-bank/register" element={<BloodBankRegister />} />
         <Route path="/blood-bank/login" element={<BloodBankLogin />} />
         <Route path="/blood-bank/set-password" element={<BloodBankSetPassword />} />
-        <Route path="/blood-bank/:tab" element={<BloodBankDashboard />} />
-
-        {/* Tracking, Inventory, Testing and Expiry Routes */}
-        <Route path="/bloodbank/units" element={<BloodBankRoute><BloodUnitsList /></BloodBankRoute>} />
-        <Route path="/bloodbank/units/add" element={<BloodBankRoute><AddBloodUnit /></BloodBankRoute>} />
-        <Route path="/bloodbank/units/:id" element={<BloodBankRoute><BloodUnitDetail /></BloodBankRoute>} />
-        <Route path="/bloodbank/testing" element={<BloodBankRoute><TestingManagement /></BloodBankRoute>} />
-        <Route path="/bloodbank/inventory" element={<BloodBankRoute><Inventory /></BloodBankRoute>} />
-        <Route path="/bloodbank/expiry" element={<BloodBankRoute><ExpiryAlerts /></BloodBankRoute>} />
-        <Route path="/bloodbank/requests/:requestId" element={<BloodBankRoute><RequestFulfillment /></BloodBankRoute>} />
+        <Route element={<BloodBankRoute><BloodBankLayout /></BloodBankRoute>}>
+          <Route path="/blood-bank/:tab" element={<BloodBankDashboard />} />
+          <Route path="/bloodbank/units" element={<BloodUnitsList />} />
+          <Route path="/bloodbank/units/add" element={<AddBloodUnit />} />
+          <Route path="/bloodbank/units/:id" element={<BloodUnitDetail />} />
+          <Route path="/bloodbank/testing" element={<TestingManagement />} />
+          <Route path="/bloodbank/inventory" element={<Inventory />} />
+          <Route path="/bloodbank/expiry" element={<ExpiryAlerts />} />
+          <Route path="/bloodbank/requests/:requestId" element={<RequestFulfillment />} />
+        </Route>
         
         {/* Recipient request routes */}
         <Route path="/recipient/request/:requestId" element={<RequestStatusRecipient />} />

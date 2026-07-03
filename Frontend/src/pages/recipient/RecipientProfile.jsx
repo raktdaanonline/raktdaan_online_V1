@@ -36,13 +36,6 @@ const RecipientProfile = () => {
         setProfile(res.data.user);
         const reqList = res.data.requests || [];
         setRequests(reqList);
-        if (reqList.length > 0) {
-          const latestReq = reqList[0];
-          if (latestReq.requestId) {
-            navigate(`/request-status/${latestReq.requestId}`, { replace: true });
-            return;
-          }
-        }
       }
     } catch (error) {
       console.error("Profile load error:", error);

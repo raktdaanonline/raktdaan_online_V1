@@ -258,7 +258,7 @@ export default function BloodBankDashboard() {
   };
 
   return (
-    <div className="bb-dashboard-wrapper">
+    <>
       <style>{`
         .bb-dashboard-wrapper {
           display: flex;
@@ -746,192 +746,7 @@ export default function BloodBankDashboard() {
         }
       `}</style>
 
-      {/* SIDEBAR */}
-      <aside className={`bb-sidebar ${!isSidebarOpen ? 'collapsed' : ''}`} data-lenis-prevent="true">
-        <div className="brand-container">
-          <div className="brand-logo" title="Blood Bank Panel">🏥</div>
-          <div>
-            <div className="brand-name">Life<span>Drop</span></div>
-            <div className="brand-subtitle">Blood Bank Panel</div>
-          </div>
-        </div>
-
-        <div className="menu-section">
-          <div className="menu-section-title">Main Menu</div>
-          <button
-            className="menu-item"
-            onClick={() => navigate("/bloodbank/inventory")}
-          >
-            <Package className="w-5 h-5" />
-            <span className="menu-item-text">Inventory Matrix</span>
-          </button>
-          <button
-            className="menu-item"
-            onClick={() => navigate("/bloodbank/units")}
-          >
-            <Layers className="w-5 h-5" />
-            <span className="menu-item-text">Blood Units Ledger</span>
-          </button>
-          <button
-            className="menu-item"
-            onClick={() => navigate("/bloodbank/testing")}
-          >
-            <FlaskConical className="w-5 h-5" />
-            <span className="menu-item-text">Lab Screening</span>
-          </button>
-          <button
-            className="menu-item"
-            onClick={() => navigate("/bloodbank/expiry")}
-          >
-            <AlertTriangle className="w-5 h-5" />
-            <span className="menu-item-text">Expiry Alerts</span>
-          </button>
-          <button
-            className={`menu-item ${currentView === "requests" ? "active" : ""}`}
-            onClick={() => navigate("/blood-bank/blood-request")}
-          >
-            <FileText className="w-5 h-5" />
-            <span className="menu-item-text">Blood Requests</span>
-          </button>
-          <button
-            className={`menu-item ${currentView === "camp-assignments" ? "active" : ""}`}
-            onClick={() => navigate("/blood-bank/camp-assignments")}
-          >
-            <Calendar className="w-5 h-5" />
-            <span className="menu-item-text">Camp Assignments</span>
-          </button>
-          <button
-            className={`menu-item ${currentView === "profile" ? "active" : ""}`}
-            onClick={() => navigate("/blood-bank/profile")}
-          >
-            <Building2 className="w-5 h-5" />
-            <span className="menu-item-text">Account Profile</span>
-          </button>
-        </div>
-
-        <div style={{ marginTop: 'auto' }}>
-          <button className="menu-item" onClick={handleLogout}>
-            <LogOut className="w-5 h-5" />
-            <span className="menu-item-text">Logout</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* MAIN CONTENT */}
-      <main className="bb-main-content" data-lenis-prevent="true">
-        <header className="bb-top-header">
-          <div className="header-title">
-            <button className="toggle-sidebar-btn border-none bg-transparent cursor-pointer flex items-center justify-center p-1 rounded-md" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-              {isSidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-            <div className="header-title-sub">
-              <span className="title">
-                {currentView === "inventory" && "Inventory"}
-                {currentView === "requests" && "Blood Requests"}
-                {currentView === "camp-assignments" && "Camp Assignments"}
-                {currentView === "profile" && "Account Profile"}
-              </span>
-              {currentView === "requests" && <span className="subtitle">Manage incoming blood requests from users, hospitals and organizations</span>}
-              {currentView === "camp-assignments" && <span className="subtitle">Review and confirm resource availability for assigned camps</span>}
-            </div>
-          </div>
-
-          <div className="header-actions">
-            {currentView === "requests" && (
-              <>
-                <div className="search-box hidden sm:flex border border-zinc-200 px-3 py-1.5 rounded-md items-center gap-2 text-sm bg-zinc-50">
-                  <Search className="w-4 h-4 text-zinc-400" />
-                  <input type="text" placeholder="Search request ID, patient..." className="border-none outline-none bg-transparent w-48" />
-                </div>
-                <button className="filter-btn hidden sm:flex"><Filter className="w-4 h-4" /> Filter</button>
-                <button className="export-btn hidden sm:flex"><Download className="w-4 h-4" /> Export</button>
-              </>
-            )}
-
-            <div className="notification-bell" onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} style={{ position: "relative" }}>
-              <Bell className="w-5 h-5" />
-              {(dbNotifications.filter(n => !n.isRead).length + requests.filter(req => req.status === "active" || req.status === "pending").length) > 0 && (
-                <div className="notification-badge">
-                  {dbNotifications.filter(n => !n.isRead).length + requests.filter(req => req.status === "active" || req.status === "pending").length}
-                </div>
-              )}
-              
-              {isNotificationsOpen && (
-                <div className="notification-dropdown" onClick={(e) => e.stopPropagation()}>
-                  <div className="notification-header">
-                    <span>Notifications</span>
-                    <span className="text-xs text-zinc-500 font-normal">
-                      {dbNotifications.filter(n => !n.isRead).length + requests.filter(req => req.status === "active" || req.status === "pending").length} New
-                    </span>
-                  </div>
-                  <div className="notification-list">
-                    {dbNotifications.length === 0 && requests.filter(req => req.status === "active" || req.status === "pending").length === 0 ? (
-                      <div className="notification-empty">No new notifications.</div>
-                    ) : (
-                      <>
-                        {dbNotifications.map(notif => (
-                          <div 
-                            key={notif._id}
-                            className={`notification-item ${!notif.isRead ? 'bg-red-50/50' : ''}`}
-                            onClick={async () => {
-                              try {
-                                await notificationService.markAsRead(notif._id);
-                                setDbNotifications(prev => prev.map(n => n._id === notif._id ? { ...n, isRead: true } : n));
-                              } catch (e) {
-                                console.error(e);
-                              }
-                            }}
-                          >
-                            <div className="flex justify-between items-start w-full">
-                              <span className="font-semibold text-red-600" style={{ fontSize: "12px" }}>{notif.title}</span>
-                              <span className="text-[9px] text-zinc-400">{new Date(notif.createdAt).toLocaleDateString()}</span>
-                            </div>
-                            <div className="text-zinc-600" style={{ fontSize: "11px", textAlign: "left", marginTop: "2px" }}>
-                              {notif.message}
-                            </div>
-                          </div>
-                        ))}
-                        {requests.filter(req => req.status === "active" || req.status === "pending").map((req) => (
-                          <div 
-                            key={req._id} 
-                            className="notification-item"
-                            onClick={() => {
-                              setCurrentView("requests");
-                              setIsNotificationsOpen(false);
-                            }}
-                          >
-                            <div className="flex justify-between items-start w-full">
-                              <span className="font-semibold text-zinc-800" style={{ fontSize: "12px" }}>{req.bloodGroup} Needed</span>
-                              <span className="text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded font-semibold uppercase">{req.urgency || "Normal"}</span>
-                            </div>
-                            <div className="text-zinc-600" style={{ fontSize: "11px", textAlign: "left" }}>
-                              Patient: <strong>{req.patientName}</strong> ({req.units} Units — {req.bloodComponent || "Not specified"})
-                            </div>
-                            <div className="text-zinc-400 flex justify-between mt-1" style={{ fontSize: "10px", width: "100%" }}>
-                              <span className="truncate max-w-[150px]">{req.hospital}</span>
-                              <span>ID: {req.requestId}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="bb-user-profile">
-              <div className="bb-user-avatar">
-                <User className="w-5 h-5" />
-              </div>
-              <div className="bb-user-info hidden sm:flex">
-                <span className="bb-user-name">{bloodBank.name}</span>
-                <span className="bb-user-role">Blood Bank</span>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <div className="bb-dashboard-content">
+      <div className="bb-dashboard-content-inner">
 
           {/* BLOOD REQUESTS VIEW */}
           {currentView === "requests" && (
@@ -1488,8 +1303,7 @@ export default function BloodBankDashboard() {
               </div>
             </div>
           )}
-        </div>
-      </main>
-    </div>
+      </div>
+    </>
   );
 }

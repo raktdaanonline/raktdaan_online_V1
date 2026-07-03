@@ -17,6 +17,14 @@ const adminService = {
     const res = await api.get("/admin/users");
     return res.data;
   },
+  updateUser: async (id, data) => {
+    const res = await api.put(`/admin/users/${id}`, data);
+    return res.data;
+  },
+  deleteUser: async (id) => {
+    const res = await api.delete(`/admin/users/${id}`);
+    return res.data;
+  },
   updateOrganizer: async (id, data) => {
     const res = await api.put(`/admin/organizers/${id}`, data);
     return res.data;

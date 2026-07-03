@@ -191,6 +191,50 @@ router.get("/users", verifyToken, async (req, res) => {
     res.status(500).json({ message: "Failed to fetch users", error: err.message });
   }
 });
+
+/* ======================================================
+   ADMIN: UPDATE USER
+====================================================== */
+router.put("/users/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, role, bloodGroup, city, mobile, totalDonations } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (name !== undefined) user.name = name;
+    if (role !== undefined) user.role = role;
+    if (bloodGroup !== undefined) user.bloodGroup = bloodGroup;
+    if (city !== undefined) user.city = city;
+    if (mobile !== undefined) user.mobile = mobile;
+    if (totalDonations !== undefined) user.totalDonations = totalDonations;
+
+    await user.save();
+    res.json({ success: true, message: "User updated successfully", user });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to update user", error: err.message });
+  }
+});
+
+/* ======================================================
+   ADMIN: DELETE USER
+====================================================== */
+router.delete("/users/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByIdAndDelete(id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.json({ success: true, message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to delete user", error: err.message });
+  }
+});
+
 /* ======================================================
    ADMIN: GET ALL BLOOD REQUESTS
 ====================================================== */

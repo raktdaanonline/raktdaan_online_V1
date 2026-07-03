@@ -187,7 +187,13 @@ const RequestStatus = () => {
 
         {/* BACK BUTTON */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            if (currentUser && currentUser.role === "recipient") {
+              navigate("/recipient/profile");
+            } else {
+              navigate(-1);
+            }
+          }}
           className="flex items-center gap-2 text-sm font-semibold text-zinc-500 hover:text-zinc-900 transition-colors w-fit"
         >
           <ArrowLeft size={16} />

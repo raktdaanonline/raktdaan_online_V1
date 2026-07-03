@@ -215,7 +215,7 @@ router.put("/me", verifyToken, async (req, res) => {
     if (latitude !== undefined) user.latitude = latitude;
     if (longitude !== undefined) user.longitude = longitude;
     if (availableForEmergency !== undefined) user.availableForEmergency = availableForEmergency;
-    if (canTravelDistance !== undefined) user.canTravelDistance = canTravelDistance;
+    if (canTravelDistance !== undefined) user.canTravelDistance = Number(canTravelDistance);
     if (preferredContactMethod !== undefined) user.preferredContactMethod = preferredContactMethod;
     if (emergencyContactName !== undefined) user.emergencyContactName = emergencyContactName;
     if (emergencyContactNumber !== undefined) user.emergencyContactNumber = emergencyContactNumber;
@@ -375,7 +375,7 @@ router.patch("/convert-to-donor", verifyToken, async (req, res) => {
 });
 
 // Get Recipient Profile Details
-router.get("/recipient/profile", verifyToken, requireRole("recipient"), async (req, res) => {
+router.get("/recipient/profile", verifyToken, requireRole("recipient", "donor"), async (req, res) => {
   try {
     const userId = req.user.id || req.user._id;
 
