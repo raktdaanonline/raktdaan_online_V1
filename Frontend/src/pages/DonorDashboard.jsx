@@ -453,7 +453,13 @@ const Dashboard = () => {
         return Promise.resolve();
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to update profile");
+      if (err.response?.status === 404 || err.response?.status === 401) {
+        toast.error("Your user session is invalid or user no longer exists. Logging out...", { id: "profile-err" });
+        logout();
+        navigate("/login");
+      } else {
+        toast.error(err.response?.data?.message || "Failed to update profile");
+      }
       return Promise.reject(err);
     } finally {
       setIsSavingProfile(false);

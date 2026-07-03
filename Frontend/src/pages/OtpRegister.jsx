@@ -25,7 +25,8 @@ const OtpRegister = () => {
     mobile: "",
     bloodGroup: "",
     city: "",
-    state: "",
+    // state: "",
+    state: "Maharashtra",
     role: role,
     age: "",
     weight: ""
@@ -388,9 +389,12 @@ const OtpRegister = () => {
                   required
                 >
                   <option value="" disabled>Select State</option>
+                  {/*
                   {INDIAN_STATES.map((st) => (
                     <option key={st} value={st}>{st}</option>
                   ))}
+                  */}
+                  <option value="Maharashtra">Maharashtra</option>
                 </select>
               </div>
             </div>

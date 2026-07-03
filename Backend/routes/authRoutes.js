@@ -215,8 +215,17 @@ router.put("/me", verifyToken, async (req, res) => {
     if (latitude !== undefined) user.latitude = latitude;
     if (longitude !== undefined) user.longitude = longitude;
     if (availableForEmergency !== undefined) user.availableForEmergency = availableForEmergency;
-    if (canTravelDistance !== undefined) user.canTravelDistance = Number(canTravelDistance);
-    if (preferredContactMethod !== undefined) user.preferredContactMethod = preferredContactMethod;
+    if (canTravelDistance !== undefined && canTravelDistance !== "" && canTravelDistance !== null) {
+      const dist = Number(canTravelDistance);
+      if ([5, 10, 20].includes(dist)) {
+        user.canTravelDistance = dist;
+      }
+    }
+    if (preferredContactMethod !== undefined && preferredContactMethod !== "" && preferredContactMethod !== null) {
+      if (["Call", "WhatsApp", "SMS"].includes(preferredContactMethod)) {
+        user.preferredContactMethod = preferredContactMethod;
+      }
+    }
     if (emergencyContactName !== undefined) user.emergencyContactName = emergencyContactName;
     if (emergencyContactNumber !== undefined) user.emergencyContactNumber = emergencyContactNumber;
 

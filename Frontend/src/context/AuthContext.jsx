@@ -30,14 +30,20 @@ export const AuthProvider = ({ children }) => {
           if (data && data.success) {
             setCurrentUser(data.user);
             localStorage.setItem("user", JSON.stringify(data.user));
+          } else {
+            localStorage.removeItem("jwt_token");
+            localStorage.removeItem("user");
+            setCurrentUser(null);
           }
         } catch (error) {
           console.error("Token verification failed", error);
           localStorage.removeItem("jwt_token");
           localStorage.removeItem("user");
+          setCurrentUser(null);
         }
       } else {
         localStorage.removeItem("user");
+        setCurrentUser(null);
       }
       setLoading(false);
     };
