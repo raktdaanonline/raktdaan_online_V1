@@ -181,10 +181,6 @@ router.post("/register", upload.single("licenseDocument"), async (req, res) => {
       return res.status(400).json({ success: false, message: "Opening and closing times are required if not 24x7." });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: "License document is required." });
-    }
-
     bloodBank.address = finalAddress;
     bloodBank.city = city;
     bloodBank.state = state;
@@ -193,7 +189,9 @@ router.post("/register", upload.single("licenseDocument"), async (req, res) => {
     bloodBank.openingTime = is24x7 ? "" : openingTime;
     bloodBank.closingTime = is24x7 ? "" : closingTime;
     bloodBank.available24x7 = is24x7;
-    bloodBank.licenseDocumentUrl = `/uploads/blood-bank-licenses/${req.file.filename}`;
+    if (req.file) {
+      bloodBank.licenseDocumentUrl = `/uploads/blood-bank-licenses/${req.file.filename}`;
+    }
     bloodBank.status = "pending";
     bloodBank.inviteTokenUsed = true;
 

@@ -146,11 +146,6 @@ export default function BloodBankRegister() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!file) {
-      toast.error("License Document upload karna mandatory hai.");
-      return;
-    }
-
     if (!formData.address.trim()) {
       toast.error("Please enter Full Address.");
       return;
@@ -171,10 +166,12 @@ export default function BloodBankRegister() {
       return;
     }
 
-    const expiryDate = new Date(formData.licenseExpiryDate);
-    if (expiryDate <= new Date()) {
-      toast.error("License expiry date future date honi chahiye.");
-      return;
+    if (formData.licenseExpiryDate) {
+      const expiryDate = new Date(formData.licenseExpiryDate);
+      if (expiryDate <= new Date()) {
+        toast.error("License expiry date future date honi chahiye.");
+        return;
+      }
     }
 
     if (!formData.is24x7 && (!formData.openTime || !formData.closeTime)) {
@@ -186,10 +183,14 @@ export default function BloodBankRegister() {
     try {
       const data = new FormData();
       Object.keys(formData).forEach((key) => {
-        data.append(key, formData[key]);
+        if (formData[key] !== undefined && formData[key] !== null) {
+          data.append(key, formData[key]);
+        }
       });
       data.append("inviteToken", inviteToken);
-      data.append("licenseDocument", file);
+      if (file) {
+        data.append("licenseDocument", file);
+      }
 
       const result = await bloodBankService.registerBloodBank(data);
       if (result.success) {
@@ -488,11 +489,10 @@ export default function BloodBankRegister() {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div>
-                <label className="block text-sm font-semibold text-zinc-400 mb-1.5">License Expiry Date *</label>
+                <label className="block text-sm font-semibold text-zinc-400 mb-1.5">License Expiry Date <span className="text-zinc-500 text-xs font-normal">(Optional)</span></label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-3 w-4.5 h-4.5 text-zinc-500" />
                   <input 
-                    required 
                     type="date" 
                     name="licenseExpiryDate" 
                     min={getTodayString()}
@@ -504,10 +504,9 @@ export default function BloodBankRegister() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-zinc-400 mb-1.5">Upload License Document *</label>
+                <label className="block text-sm font-semibold text-zinc-400 mb-1.5">Upload License Document <span className="text-zinc-500 text-xs font-normal">(Optional)</span></label>
                 <div className="relative border-2 border-dashed border-zinc-700 hover:border-[#E24B4A] rounded-xl p-4 transition-all bg-zinc-900/30 text-center flex flex-col items-center justify-center cursor-pointer">
                   <input 
-                    required 
                     type="file" 
                     accept=".pdf,image/*" 
                     onChange={handleFileChange}

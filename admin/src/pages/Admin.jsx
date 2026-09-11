@@ -1576,7 +1576,6 @@ const Admin = () => {
             <span className="menu-item-icon">🩸</span> <span className="menu-item-text">Blood Requests</span>
           </button>
 
-
           <button
             className={`menu-item ${currentView === "organizers" ? "active" : ""}`}
             onClick={() => setCurrentView("organizers")}

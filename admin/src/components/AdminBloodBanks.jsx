@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock } from "lucide-react";
+import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key } from "lucide-react";
 import adminService from "../services/adminService";
 import AdminInviteBloodBank from "./AdminInviteBloodBank";
 
@@ -16,10 +16,69 @@ export default function AdminBloodBanks() {
   const [rejectionReason, setRejectionReason] = useState("");
   const [isSuspending, setIsSuspending] = useState(false);
   const [suspensionReason, setSuspensionReason] = useState("");
+  const [copiedId, setCopiedId] = useState(null);
+  const [copiedPassId, setCopiedPassId] = useState(null);
 
   useEffect(() => {
     fetchBloodBanks();
   }, [activeTab]);
+
+  const copyToClipboard = async (text) => {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = text;
+      textArea.style.position = "fixed";
+      textArea.style.left = "-999999px";
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      document.execCommand("copy");
+      textArea.remove();
+    }
+  };
+
+  const handleCopyInviteLink = async (id) => {
+    setActionLoading(true);
+    try {
+      const res = await adminService.getInviteLink(id);
+      if (res.success && res.inviteLink) {
+        await copyToClipboard(res.inviteLink);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2500);
+        toast.success("Registration link copied to clipboard!");
+        fetchBloodBanks();
+      } else {
+        toast.error("Failed to generate registration link");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error generating registration link");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleCopyPasswordLink = async (id) => {
+    setActionLoading(true);
+    try {
+      const res = await adminService.getPasswordLink(id);
+      const link = res.setupLink || res.passwordLink;
+      if (res.success && link) {
+        await copyToClipboard(link);
+        setCopiedPassId(id);
+        setTimeout(() => setCopiedPassId(null), 2500);
+        toast.success("Password setup link copied to clipboard!");
+        fetchBloodBanks();
+      } else {
+        toast.error("Failed to generate password setup link");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error generating password link");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const fetchBloodBanks = async () => {
     setLoading(true);
@@ -295,14 +354,56 @@ export default function AdminBloodBanks() {
                         <Eye className="w-3.5 h-3.5" /> View Details
                       </button>
 
-                      {bank.status === "invited" && (
+                      {(bank.status === "approved" || bank.status === "active") && (
                         <button
                           disabled={actionLoading}
-                          onClick={() => handleResendInvite(bank._id)}
-                          className="flex items-center gap-1 px-3 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded text-xs font-bold transition-all border border-red-500/20 cursor-pointer"
+                          onClick={() => handleCopyPasswordLink(bank._id)}
+                          className="flex items-center gap-1 px-3 py-1 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 hover:text-emerald-300 rounded text-xs font-bold transition-all border border-emerald-500/30 cursor-pointer"
+                          title="Copy Password Setup Link (Pass Link)"
                         >
-                          <RefreshCw className="w-3.5 h-3.5" /> Resend Invite
+                          {copiedPassId === bank._id ? (
+                            <>
+                              <Check className="w-3.5 h-3.5 text-green-400" />
+                              <span className="text-green-400">Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Key className="w-3.5 h-3.5" />
+                              <span>Pass Link</span>
+                            </>
+                          )}
                         </button>
+                      )}
+
+                      {bank.status === "invited" && (
+                        <>
+                          <button
+                            disabled={actionLoading}
+                            onClick={() => handleCopyInviteLink(bank._id)}
+                            className="flex items-center gap-1 px-3 py-1 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 rounded text-xs font-bold transition-all border border-blue-500/20 cursor-pointer"
+                            title="Copy Blood Bank Registration Link"
+                          >
+                            {copiedId === bank._id ? (
+                              <>
+                                <Check className="w-3.5 h-3.5 text-green-400" />
+                                <span className="text-green-400">Copied!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>Copy Link</span>
+                              </>
+                            )}
+                          </button>
+
+                          <button
+                            disabled={actionLoading}
+                            onClick={() => handleResendInvite(bank._id)}
+                            className="flex items-center gap-1 px-3 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded text-xs font-bold transition-all border border-red-500/20 cursor-pointer"
+                          >
+                            <RefreshCw className="w-3.5 h-3.5" /> Resend Invite
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -487,6 +588,33 @@ export default function AdminBloodBanks() {
               )}
 
               {/* Action Buttons */}
+              {selectedBank.status === "invited" && (
+                <div className="pt-4 border-t border-zinc-800 flex gap-2">
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => handleCopyInviteLink(selectedBank._id)}
+                    className="flex-1 py-2.5 bg-blue-600/15 hover:bg-blue-600/25 text-blue-400 rounded font-bold text-xs transition-colors flex items-center justify-center gap-1.5 border border-blue-500/30 cursor-pointer"
+                  >
+                    {copiedId === selectedBank._id ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-400" /> <span className="text-green-400">Registration Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" /> Copy Registration Link
+                      </>
+                    )}
+                  </button>
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => handleResendInvite(selectedBank._id)}
+                    className="flex-1 py-2.5 bg-red-600/15 hover:bg-red-600/25 text-red-400 rounded font-bold text-xs transition-colors flex items-center justify-center gap-1.5 border border-red-500/30 cursor-pointer"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Resend Invite Email
+                  </button>
+                </div>
+              )}
+
               {selectedBank.status === "pending" && (
                 <div className="pt-4 border-t border-zinc-800 space-y-3">
                   {!isRejecting ? (
@@ -533,6 +661,27 @@ export default function AdminBloodBanks() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {(selectedBank.status === "approved" || selectedBank.status === "active") && (
+                <div className="pt-4 border-t border-zinc-800">
+                  <button
+                    disabled={actionLoading}
+                    onClick={() => handleCopyPasswordLink(selectedBank._id)}
+                    className="w-full py-2.5 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 rounded font-bold text-xs transition-colors flex items-center justify-center gap-1.5 border border-emerald-500/30 cursor-pointer"
+                    title="Copy Password Setup Link (Pass Link)"
+                  >
+                    {copiedPassId === selectedBank._id ? (
+                      <>
+                        <Check className="w-4 h-4 text-green-400" /> <span className="text-green-400">Password Setup Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Key className="w-4 h-4" /> Copy Pass Link (Password Setup)
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 

@@ -95,14 +95,18 @@ export default function AdminBloodBankRequests() {
                 <div>
                   <span className="block text-xs text-zinc-500 uppercase tracking-wider mb-1">License</span>
                   <p className="text-white">{bank.licenseNumber}</p>
-                  <a 
-                    href={`${backendUrl}${bank.licenseDocumentUrl}`} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-blue-400 hover:text-blue-300 mt-1 transition-colors"
-                  >
-                    <FileText className="w-3 h-3" /> View Document
-                  </a>
+                  {bank.licenseDocumentUrl ? (
+                    <a 
+                      href={`${backendUrl}${bank.licenseDocumentUrl}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-blue-400 hover:text-blue-300 mt-1 transition-colors"
+                    >
+                      <FileText className="w-3 h-3" /> View Document
+                    </a>
+                  ) : (
+                    <span className="text-xs text-zinc-500 italic mt-1 block">Not Uploaded</span>
+                  )}
                 </div>
               </div>
 

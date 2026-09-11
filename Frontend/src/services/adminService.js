@@ -93,6 +93,14 @@ const adminService = {
     const res = await api.post(`/blood-bank/${id}/resend-invite`);
     return res.data;
   },
+  getInviteLink: async (id) => {
+    const res = await api.post(`/blood-bank/${id}/invite-link`);
+    return res.data;
+  },
+  getPasswordLink: async (id) => {
+    const res = await api.post(`/blood-bank/${id}/password-link`);
+    return res.data;
+  },
   suspendBloodBank: async (id, note) => {
     const res = await api.put(`/blood-bank/${id}/suspend`, { note });
     return res.data;

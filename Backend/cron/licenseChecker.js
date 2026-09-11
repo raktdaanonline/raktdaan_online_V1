@@ -13,7 +13,7 @@ const job = cron.schedule("0 8 * * *", async () => {
     // 1. Expiring in 30 days — notify blood bank + admin
     const expiringSoon = await BloodBank.find({
       status: "active",
-      licenseExpiryDate: { $lte: thirtyDays, $gt: now }
+      licenseExpiryDate: { $exists: true, $ne: null, $lte: thirtyDays, $gt: now }
     });
 
     for (const bank of expiringSoon) {
@@ -51,7 +51,7 @@ const job = cron.schedule("0 8 * * *", async () => {
     // 2. Already expired — auto suspend and notify
     const expiredList = await BloodBank.find({
       status: "active",
-      licenseExpiryDate: { $lt: now }
+      licenseExpiryDate: { $exists: true, $ne: null, $lt: now }
     });
 
     if (expiredList.length > 0) {
