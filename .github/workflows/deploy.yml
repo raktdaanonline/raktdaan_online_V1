@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Build & Deploy
@@ -60,11 +63,14 @@ jobs:
 
       - name: Deploy on VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          envs: GITHUB_TOKEN
           script: |
             set -e
 
@@ -74,7 +80,7 @@ jobs:
             export DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
 
             # Pull latest code from GitHub.
-            git fetch origin main
+            git -c http.extraheader="AUTHORIZATION: bearer $GITHUB_TOKEN" fetch origin main
             git reset --hard origin/main
 
             COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
