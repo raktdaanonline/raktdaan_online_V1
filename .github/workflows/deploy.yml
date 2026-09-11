@@ -80,7 +80,8 @@ jobs:
             export DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
 
             # Pull latest code from GitHub.
-            git -c http.extraheader="AUTHORIZATION: bearer $GITHUB_TOKEN" fetch origin main
+            GIT_AUTH=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w 0)
+            git -c http.extraheader="AUTHORIZATION: basic $GIT_AUTH" fetch origin main
             git reset --hard origin/main
 
             COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
