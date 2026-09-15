@@ -5,9 +5,10 @@ import ImpactGalleryAdmin from "../components/ImpactGalleryAdmin.jsx";
 import SuccessStoriesAdmin from "../components/SuccessStoriesAdmin.jsx";
 import NewsAdmin from "../components/NewsAdmin.jsx";
 import BloodRequestBackgroundAdmin from "../components/BloodRequestBackgroundAdmin.jsx";
-import HomeContentAdmin from "../components/HomeContentAdmin.jsx";
 import AdminBloodBanks from "../components/AdminBloodBanks.jsx";
 import AdminBloodBankRequests from "../components/AdminBloodBankRequests.jsx";
+import HomeContentAdmin from "../components/HomeContentAdmin.jsx";
+import CityManagementAdmin from "../components/CityManagementAdmin.jsx";
 import adminService from "../services/adminService";
 import campService from "../services/campService";
 import donorService from "../services/donorService";
@@ -48,7 +49,29 @@ const daysUntil = (date) => {
 };
 
 const Admin = () => {
-  const [currentView, setCurrentView] = useState("dashboard"); // "dashboard" | "camps" | "users" | "enquiries" | "organizers"
+  const [currentView, _setCurrentView] = useState("dashboard"); // "dashboard" | "camps" | "users" | "enquiries" | "organizers"
+  const [viewHistory, setViewHistory] = useState(["dashboard"]);
+
+  const setCurrentView = (newView) => {
+    setViewHistory((prev) => {
+      if (prev[prev.length - 1] === newView) return prev;
+      return [...prev, newView];
+    });
+    _setCurrentView(newView);
+  };
+
+  const handleGoBack = () => {
+    if (viewHistory.length > 1) {
+      const newHistory = [...viewHistory];
+      newHistory.pop(); // remove current view
+      const prevView = newHistory[newHistory.length - 1];
+      setViewHistory(newHistory);
+      _setCurrentView(prevView);
+    } else {
+      navigate(-1);
+    }
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [donors, setDonors] = useState([]);
   const [camps, setCamps] = useState([]);
@@ -67,15 +90,26 @@ const Admin = () => {
   const [bloodRequests, setBloodRequests] = useState([]);
   const [loadingBloodRequests, setLoadingBloodRequests] = useState(false);
   const [totalPlatformUsers, setTotalPlatformUsers] = useState(0);
-  const [brFilterState, setBrFilterState] = useState("");
-  const [brFilterBloodGroup, setBrFilterBloodGroup] = useState("");
-  const [brFilterStatus, setBrFilterStatus] = useState("");
-  const [brSearchQuery, setBrSearchQuery] = useState("");
-  const [notifyingId, setNotifyingId] = useState(null);
+
+  // --- Blood Banks Dashboard States ---
+  const [bloodBankStats, setBloodBankStats] = useState({
+    total: 0,
+    active: 0,
+    pending: 0,
+    invited: 0,
+    rejected: 0,
+    suspended: 0,
+  });
+  const [cityDistribution, setCityDistribution] = useState([]);
+  const [loadingBloodBankStats, setLoadingBloodBankStats] = useState(false);
 
   // Donor Edit states
   const [editDonorId, setEditDonorId] = useState(null);
   const [editForm, setEditForm] = useState({});
+
+  // Platform User Edit states
+  const [editPlatformUserId, setEditPlatformUserId] = useState(null);
+  const [editPlatformUserForm, setEditPlatformUserForm] = useState({});
 
   // Camp Edit states
   const [editCampId, setEditCampId] = useState(null);
@@ -113,6 +147,9 @@ const Admin = () => {
   const [newEnquiryPassword, setNewEnquiryPassword] = useState("");
   const [editingEnquiry, setEditingEnquiry] = useState(null);
   const [editEnquiryForm, setEditEnquiryForm] = useState({});
+  const [approvedBloodBanks, setApprovedBloodBanks] = useState([]);
+  const [availableBloodBanksMap, setAvailableBloodBanksMap] = useState({});
+  const [selectedBloodBankId, setSelectedBloodBankId] = useState({});
 
   // --- Organizers Page States ---
   const [editOrganizerId, setEditOrganizerId] = useState(null);
@@ -199,7 +236,7 @@ const Admin = () => {
 
   useEffect(() => {
     if (!token) {
-      navigate("/admin-login");
+      navigate("/login");
       return;
     }
     fetchCamps();
@@ -208,7 +245,35 @@ const Admin = () => {
     fetchThemeSettings();
     fetchBloodRequests();
     fetchTotalUsers();
+    fetchBloodBankStats();
   }, []);
+
+  const [timeTicker, setTimeTicker] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setTimeTicker(Date.now()), 1000); // update every 1 second (live tick)
+    return () => clearInterval(timer);
+  }, []);
+
+  const canReassign = (enquiry) => {
+    if (!enquiry.assignedBloodBank) return true;
+    if (enquiry.bloodBankStatus === "accepted") return false; // Cannot reassign if already accepted!
+    if (enquiry.bloodBankStatus === "none" || enquiry.bloodBankStatus === "rejected") return true;
+    const assignedTime = enquiry.bloodBankAssignedAt || enquiry.updatedAt;
+    if (!assignedTime) return true;
+    const timeDiff = timeTicker - new Date(assignedTime).getTime();
+    const minutesPassed = timeDiff / (1000 * 60);
+    return minutesPassed <= 5;
+  };
+
+  const getRemainingTime = (assignedAt, updatedAt) => {
+    const assignedTime = assignedAt || updatedAt;
+    if (!assignedTime) return "0:00";
+    const timeDiff = timeTicker - new Date(assignedTime).getTime();
+    const secondsRemaining = Math.max(0, 300 - Math.floor(timeDiff / 1000));
+    const mins = Math.floor(secondsRemaining / 60);
+    const secs = secondsRemaining % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
 
   const fetchTotalUsers = async () => {
     try {
@@ -218,6 +283,27 @@ const Admin = () => {
       console.error("Failed to load total users", err);
     }
   };
+
+  const fetchBloodBankStats = async () => {
+    setLoadingBloodBankStats(true);
+    try {
+      const res = await adminService.getBloodBankStats();
+      if (res && res.success) {
+        if (res.stats) setBloodBankStats(res.stats);
+        if (res.cityDistribution) setCityDistribution(res.cityDistribution);
+      }
+    } catch (err) {
+      console.error("Failed to load blood bank stats in Admin:", err);
+    } finally {
+      setLoadingBloodBankStats(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === "dashboard") {
+      fetchBloodBankStats();
+    }
+  }, [currentView]);
 
   const fetchAllUsers = async () => {
     setLoadingAllUsers(true);
@@ -235,36 +321,15 @@ const Admin = () => {
     if (currentView === "all-users") fetchAllUsers();
   }, [currentView]);
 
-  const fetchBloodRequests = async (filters = {}) => {
+  const fetchBloodRequests = async () => {
     setLoadingBloodRequests(true);
     try {
-      const params = {};
-      if (filters.state) params.state = filters.state;
-      if (filters.bloodGroup) params.bloodGroup = filters.bloodGroup;
-      if (filters.status) params.status = filters.status;
-      const data = await adminService.getBloodRequests(params);
+      const data = await adminService.getBloodRequests();
       setBloodRequests(data || []);
     } catch (err) {
       console.error("Failed to load blood requests", err);
     } finally {
       setLoadingBloodRequests(false);
-    }
-  };
-
-  const handleNotifyDonors = async (reqId) => {
-    if (!window.confirm("Re-notify all matching donors and blood banks?")) return;
-    setNotifyingId(reqId);
-    try {
-      const res = await adminService.notifyBloodRequest(reqId);
-      if (res.success) {
-        toast.success(`Notified ${res.notifiedCount ?? ""} donors/banks!`);
-      } else {
-        toast.error(res.message || "Notification failed");
-      }
-    } catch (err) {
-      toast.error("Error sending notifications");
-    } finally {
-      setNotifyingId(null);
     }
   };
 
@@ -347,11 +412,53 @@ const Admin = () => {
     setLoadingEnquiries(true);
     try {
       const data = await adminService.getEnquiries();
-      setEnquiries(Array.isArray(data) ? data : []);
+      const enquiriesList = Array.isArray(data) ? data : [];
+      setEnquiries(enquiriesList);
+
+      const bbData = await adminService.getBloodBanks();
+      let activeOrApproved = [];
+      if (bbData && bbData.success) {
+        activeOrApproved = bbData.data.filter(bb => bb.status === "approved" || bb.status === "active");
+        setApprovedBloodBanks(activeOrApproved);
+      }
+
+      // Fetch available blood banks for each enquiry on its camp date
+      const availMap = {};
+      await Promise.all(
+        enquiriesList.map(async (enq) => {
+          if (enq.preferredDate) {
+            try {
+              const dateStr = enq.preferredDate.split("T")[0];
+              const res = await adminService.getAvailableBloodBanks(dateStr, enq._id);
+              if (res.success) {
+                availMap[enq._id] = res.data;
+              }
+            } catch (err) {
+              console.error("Failed to fetch available blood banks for enquiry", enq._id, err);
+            }
+          }
+        })
+      );
+      setAvailableBloodBanksMap(availMap);
     } catch (err) {
       console.error("Failed to load enquiries", err);
     } finally {
       setLoadingEnquiries(false);
+    }
+  };
+
+  const handleAssignBloodBank = async (enquiryId) => {
+    const bloodBankId = selectedBloodBankId[enquiryId];
+    if (!bloodBankId) {
+      toast.error("Please select a Blood Bank first.");
+      return;
+    }
+    try {
+      const res = await adminService.assignBloodBank(enquiryId, bloodBankId);
+      toast.success(res.message || "Blood Bank assigned successfully!");
+      fetchEnquiries();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to assign blood bank.");
     }
   };
 
@@ -460,8 +567,10 @@ const Admin = () => {
 
   // --- Camps & Donors Logic ---
   useEffect(() => {
-    if (selectedCamp) fetchDonors();
-  }, [selectedCamp]);
+    if (selectedCamp && currentView === "users") {
+      fetchDonors();
+    }
+  }, [selectedCamp, currentView]);
 
   const fetchCamps = async () => {
     setLoadingCamps(true);
@@ -503,7 +612,7 @@ const Admin = () => {
 
   const handleLogout = () => {
     localStorage.removeItem("admin-token");
-    navigate("/admin-login");
+    navigate("/login");
   };
 
   const handleNewCampChange = (e) => {
@@ -610,6 +719,43 @@ const Admin = () => {
     } catch (err) {
       console.error(err.response || err);
       toast.error(err?.response?.data?.message || "Error saving donor update");
+    }
+  };
+
+  // Platform User Edit & Delete methods
+  const handleEditPlatformUserClick = (user) => {
+    setEditPlatformUserId(user._id);
+    setEditPlatformUserForm({ ...user });
+  };
+
+  const handleEditPlatformUserChange = (e) => {
+    const { name, value } = e.target;
+    setEditPlatformUserForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleEditPlatformUserSave = async (id) => {
+    try {
+      await adminService.updateUser(id, editPlatformUserForm);
+      setAllUsers(prev =>
+        prev.map(u => u._id === id ? { ...u, ...editPlatformUserForm } : u)
+      );
+      setEditPlatformUserId(null);
+      toast.success("User updated successfully!");
+    } catch (err) {
+      console.error("Error saving user:", err.response || err);
+      toast.error(err?.response?.data?.message || "Error saving user update");
+    }
+  };
+
+  const handleDeletePlatformUser = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+    try {
+      await adminService.deleteUser(id);
+      setAllUsers(prev => prev.filter(u => u._id !== id));
+      toast.success("User deleted successfully!");
+    } catch (err) {
+      console.error("Error deleting user:", err.response || err);
+      toast.error(err?.response?.data?.message || "Error deleting user");
     }
   };
 
@@ -841,14 +987,14 @@ const Admin = () => {
   const handleCampPhotosUpload = async (e) => {
     e.preventDefault();
     if (!campPhotosFiles || campPhotosFiles.length === 0) return toast.error("Please select at least one photo");
-    
+
     setUploadingPhotos(true);
     try {
       const formData = new FormData();
       Array.from(campPhotosFiles).forEach(file => {
         formData.append("photos", file);
       });
-      
+
       const res = await campService.uploadCampPhotos(photosCampId, formData);
       if (res.success) {
         toast.success("Photos uploaded successfully!");
@@ -1372,15 +1518,48 @@ const Admin = () => {
           font-weight: 600;
           color: #64748b;
         }
+        .copyright-footer {
+          text-align: center;
+          padding: 1.5rem 2rem;
+          font-size: 0.8rem;
+          color: #64748b;
+          border-top: 1px solid #e2e8f0;
+          margin-top: auto;
+          background-color: #ffffff;
+          font-weight: 500;
+        }
       `}</style>
       {/* 1. Left Sidebar Navigation */}
       <aside className={`sidebar ${!isSidebarOpen ? 'collapsed' : ''}`} data-lenis-prevent="true">
-        <div className="brand-container">
-          <div className="brand-logo" title="LifeDrop">🩸</div>
-          <div>
-            <div className="brand-name">Life<span>Drop</span></div>
-            <div className="brand-subtitle">Admin Panel</div>
-          </div>
+        <div className="brand-container" style={{ display: "flex", justifyContent: isSidebarOpen ? "space-between" : "center", alignItems: "center", width: "100%", marginBottom: "2rem" }}>
+          {isSidebarOpen && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div className="brand-logo" title="LifeDrop">🩸</div>
+              <div>
+                <div className="brand-name">Life<span>Drop</span></div>
+                <div className="brand-subtitle">Admin Panel</div>
+              </div>
+            </div>
+          )}
+          <button
+            className="toggle-sidebar-btn-sidebar"
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            title="Toggle Sidebar"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#cbd5e1",
+              fontSize: "1.25rem",
+              cursor: "pointer",
+              padding: "0.5rem",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "0.375rem"
+            }}
+          >
+            ☰
+          </button>
         </div>
 
         <div className="menu-section">
@@ -1411,8 +1590,8 @@ const Admin = () => {
             <span className="menu-item-icon">🏥</span> <span className="menu-item-text">Blood Banks</span>
           </button>
           <button
-            className={`menu-item ${currentView === "users" ? "active" : ""}`}
-            onClick={() => setCurrentView("users")}
+            className={`menu-item ${currentView === "all-users" ? "active" : ""}`}
+            onClick={() => setCurrentView("all-users")}
             title="Donors (Users)"
           >
             <span className="menu-item-icon">👥</span> <span className="menu-item-text">Donors (Users)</span>
@@ -1433,25 +1612,18 @@ const Admin = () => {
           </button>
 
           <button
-            className={`menu-item ${currentView === "blood-bank-requests" ? "active" : ""}`}
-            onClick={() => setCurrentView("blood-bank-requests")}
-            title="Blood Bank Requests"
-          >
-            <span className="menu-item-icon">🏥</span> <span className="menu-item-text">Blood Bank Requests</span>
-          </button>
-          <button
-            className={`menu-item ${currentView === "blood-banks" ? "active" : ""}`}
-            onClick={() => setCurrentView("blood-banks")}
-            title="Blood Banks"
-          >
-            <span className="menu-item-icon">🏨</span> <span className="menu-item-text">Blood Banks</span>
-          </button>
-          <button
             className={`menu-item ${currentView === "organizers" ? "active" : ""}`}
             onClick={() => setCurrentView("organizers")}
             title="Organizers"
           >
             <span className="menu-item-icon">🤝</span> <span className="menu-item-text">Organizers</span>
+          </button>
+          <button
+            className={`menu-item ${currentView === "cities" ? "active" : ""}`}
+            onClick={() => setCurrentView("cities")}
+            title="City Management"
+          >
+            <span className="menu-item-icon">🏙️</span> <span className="menu-item-text">City Management</span>
           </button>
         </div>
 
@@ -1460,16 +1632,16 @@ const Admin = () => {
           <button
             className={`menu-item ${currentView === "uiux" ? "active" : ""}`}
             onClick={() => setCurrentView("uiux")}
-            title="UI/UX"
+            title="Hero Banner"
           >
-            <span className="menu-item-icon">🎨</span> <span className="menu-item-text">UI/UX (Personalization)</span>
+            <span className="menu-item-icon">🎨</span> <span className="menu-item-text">Hero Banner</span>
           </button>
           <button
             className={`menu-item ${currentView === "blood-request-background" ? "active" : ""}`}
             onClick={() => setCurrentView("blood-request-background")}
-            title="Blood Request Background"
+            title="Form Background"
           >
-            <span className="menu-item-icon">🖼️</span> <span className="menu-item-text">Blood Request Background</span>
+            <span className="menu-item-icon">🖼️</span> <span className="menu-item-text">Form Background</span>
           </button>
           <button
             className={`menu-item ${currentView === "impact-gallery" ? "active" : ""}`}
@@ -1506,7 +1678,7 @@ const Admin = () => {
         </div>
 
         <div className="emergency-button-container">
-          <button className="emergency-btn">🚨 Emergency Requests</button>
+          <button className="emergency-btn" onClick={() => setCurrentView("blood-requests")}>🚨 Emergency Requests</button>
         </div>
       </aside>
 
@@ -1514,9 +1686,21 @@ const Admin = () => {
       <main className="main-content" data-lenis-prevent="true">
         {/* Top Header Bar */}
         <header className="top-header">
-          <div className="header-left">
-            <button className="toggle-sidebar-btn" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
-              {isSidebarOpen ? '🡨' : '☰'}
+          <div className="header-left" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              className="btn btn-sm btn-outline-danger d-flex align-items-center gap-2"
+              onClick={handleGoBack}
+              title="Go Back"
+              style={{
+                borderRadius: "8px",
+                padding: "0.4rem 0.85rem",
+                fontSize: "0.85rem",
+                fontWeight: "700",
+                cursor: "pointer",
+                transition: "all 0.2s ease"
+              }}
+            >
+              ← Go Back
             </button>
           </div>
 
@@ -1545,8 +1729,8 @@ const Admin = () => {
             </div>
 
             <div className="stats-grid">
-              <div 
-                className="stat-card" 
+              <div
+                className="stat-card"
                 onClick={() => setCurrentView("all-users")}
                 style={{ cursor: "pointer" }}
               >
@@ -1584,70 +1768,33 @@ const Admin = () => {
                   <span className="stat-trend up">▲ 6.1%</span>
                 </div>
               </div>
-            </div>
 
-            <div className="charts-grid">
-              <div className="chart-card">
-                <div className="chart-header">
-                  <h3 className="chart-title">Donations Overview</h3>
-                  <select className="chart-select">
-                    <option>This Week</option>
-                  </select>
+              <div
+                className="stat-card"
+                onClick={() => setCurrentView("blood-banks")}
+                style={{ cursor: "pointer" }}
+              >
+                <div className="stat-icon-container" style={{ backgroundColor: "#fef2f2", color: "#e11d48", fontSize: "1.5rem" }}>
+                  🏥
                 </div>
-                <div className="line-chart-container">
-                  <div className="chart-grid-line" style={{ bottom: "25%" }} />
-                  <div className="chart-grid-line" style={{ bottom: "50%" }} />
-                  <div className="chart-grid-line" style={{ bottom: "75%" }} />
-
-                  <svg viewBox="0 0 500 150" style={{ width: "100%", height: "100%", overflow: "visible" }}>
-                    <path
-                      d="M 10 120 Q 80 50 160 100 T 320 30 T 480 90"
-                      fill="none"
-                      stroke="#ff2e4b"
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                    />
-                    <circle cx="160" cy="100" r="5" fill="#ff2e4b" filter="drop-shadow(0 0 3px #ff2e4b)" />
-                    <circle cx="320" cy="30" r="5" fill="#ff2e4b" filter="drop-shadow(0 0 3px #ff2e4b)" />
-                  </svg>
-                </div>
-                <div className="d-flex justify-content-between mt-2 px-2">
-                  <span className="chart-axis-label">May 25</span>
-                  <span className="chart-axis-label">May 26</span>
-                  <span className="chart-axis-label">May 27</span>
-                  <span className="chart-axis-label">May 28</span>
-                  <span className="chart-axis-label">May 29</span>
-                  <span className="chart-axis-label">May 30</span>
-                  <span className="chart-axis-label">May 31</span>
-                </div>
-              </div>
-
-              <div className="chart-card">
-                <div className="chart-header">
-                  <h3 className="chart-title">Blood Group Distribution</h3>
-                </div>
-                <div className="pie-chart-wrapper">
-                  {renderDonutChart()}
-                  <div className="pie-legend">
-                    {bloodGroupStats.list.map((bg) => (
-                      <div className="legend-item" key={bg.label}>
-                        <div className="legend-left">
-                          <span className="legend-color" style={{ backgroundColor: bg.color }} />
-                          <span className="legend-label">{bg.label}</span>
-                        </div>
-                        <span className="legend-value">{bg.percentage}% ({bg.count})</span>
-                      </div>
-                    ))}
-                  </div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Blood Banks</span>
+                  <span className="stat-value">{bloodBankStats.total || 0}</span>
+                  <span className="stat-trend up" style={{ color: "#16a34a", fontSize: "0.75rem", fontWeight: 700 }}>
+                    {bloodBankStats.active || 0} Active • {bloodBankStats.pending || 0} Pending
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="dashboard-details-grid">
+
+            <div className="dashboard-details-grid" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              
+              {/* Card 1: Live Blood Requests */}
               <div className="table-card">
                 <div className="table-header">
                   <h3 className="table-title">Live Blood Requests (Last 24 Hours)</h3>
-                  <button className="view-all-link" onClick={() => setCurrentView("dashboard")}>View All</button>
+                  <button className="view-all-link" onClick={() => setCurrentView("blood-requests")}>View All</button>
                 </div>
 
                 <div className="custom-table-container">
@@ -1697,6 +1844,100 @@ const Admin = () => {
                     );
                   })()}
                 </div>
+              </div>
+
+              {/* Card 2: Listings by City (Purple Grid Blocks) */}
+              <div className="table-card" style={{ padding: "1.75rem" }}>
+                <div className="table-header" style={{ marginBottom: "1.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <h3 className="table-title" style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1e293b", margin: 0 }}>
+                      Listings by City
+                    </h3>
+                  </div>
+                  <button className="view-all-link" onClick={() => setCurrentView("blood-banks")}>
+                    Manage All →
+                  </button>
+                </div>
+
+                {loadingBloodBankStats ? (
+                  <p className="text-center py-8 text-muted">Loading city listings...</p>
+                ) : cityDistribution.filter((item) => (item.total || 0) > 0).length === 0 ? (
+                  <p className="text-center py-8 text-muted">No cities with registered blood banks found.</p>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
+                      gap: "14px",
+                      width: "100%",
+                    }}
+                  >
+                    {cityDistribution
+                      .filter((item) => (item.total || 0) > 0)
+                      .map((item) => (
+                      <div
+                        key={item._id}
+                        onClick={() => setCurrentView("blood-banks")}
+                        style={{
+                          background: "#5b4df3",
+                          backgroundColor: "#5b4df3",
+                          borderRadius: "14px",
+                          padding: "18px 8px 14px 8px",
+                          textAlign: "center",
+                          color: "#ffffff",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease-in-out",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: "92px",
+                          boxShadow: "0 4px 14px rgba(91, 77, 243, 0.28)",
+                          userSelect: "none",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-4px)";
+                          e.currentTarget.style.boxShadow = "0 10px 22px rgba(91, 77, 243, 0.45)";
+                          e.currentTarget.style.backgroundColor = "#4f3fed";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "0 4px 14px rgba(91, 77, 243, 0.28)";
+                          e.currentTarget.style.backgroundColor = "#5b4df3";
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "1.75rem",
+                            fontWeight: 800,
+                            lineHeight: "1.1",
+                            color: "#ffffff",
+                            letterSpacing: "-0.02em",
+                          }}
+                        >
+                          {item.total}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.8rem",
+                            fontWeight: 500,
+                            color: "rgba(255, 255, 255, 0.95)",
+                            marginTop: "6px",
+                            textTransform: "capitalize",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: "100%",
+                            padding: "0 4px",
+                          }}
+                          title={item.cityName || item._id}
+                        >
+                          {item.cityName || item._id}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>
@@ -1768,6 +2009,7 @@ const Admin = () => {
                           <td className="fw-bold text-danger">{camp.title || camp.name || camp.campId}</td>
                           <td>
                             <div>{camp.date ? new Date(camp.date).toLocaleDateString() : "No date"}</div>
+                            {camp.time && <div className="small text-muted mt-1">🕒 {camp.time}</div>}
                             <div className="mt-1">{whenBadge(camp.date)}</div>
                           </td>
                           <td>
@@ -1794,20 +2036,20 @@ const Admin = () => {
                             </span>
                           </td>
                           <td>
-                              <div className="d-flex flex-wrap gap-2">
-                                <button
-                                  className="btn btn-outline-danger btn-sm"
-                                  onClick={() => {
-                                    setSelectedCamp(camp._id);
-                                    setCurrentView("users");
-                                  }}
-                                >
-                                  View Donors
-                                </button>
-                                <button className="btn btn-sm btn-light border" onClick={() => handleManagePhotosClick(camp)} title="Manage Photos">📸</button>
-                                <button className="btn btn-sm btn-light border" onClick={() => handleEditCampClick(camp)} title="Edit Camp">✏️</button>
-                                <button className="btn btn-sm btn-light border text-danger" onClick={() => handleDeleteCamp(camp._id)} title="Delete Camp">🗑️</button>
-                                <button
+                            <div className="d-flex flex-wrap gap-2">
+                              <button
+                                className="btn btn-outline-danger btn-sm"
+                                onClick={() => {
+                                  setSelectedCamp(camp._id);
+                                  setCurrentView("users");
+                                }}
+                              >
+                                View Donors
+                              </button>
+                              <button className="btn btn-sm btn-light border" onClick={() => handleManagePhotosClick(camp)} title="Manage Photos">📸</button>
+                              <button className="btn btn-sm btn-light border" onClick={() => handleEditCampClick(camp)} title="Edit Camp">✏️</button>
+                              <button className="btn btn-sm btn-light border text-danger" onClick={() => handleDeleteCamp(camp._id)} title="Delete Camp">🗑️</button>
+                              <button
                                 className="btn btn-sm btn-primary"
                                 onClick={() => {
                                   if (past) return;
@@ -1886,7 +2128,7 @@ const Admin = () => {
                     </div>
                     <div className="modal-body">
                       <p className="text-muted small mb-4">Camp: <strong>{photosCampObj.name || photosCampObj.title}</strong></p>
-                      
+
                       {/* Existing Photos Grid */}
                       <h6 className="fw-bold mb-3">Uploaded Photos ({photosCampObj.photos?.length || 0})</h6>
                       {photosCampObj.photos && photosCampObj.photos.length > 0 ? (
@@ -1903,10 +2145,10 @@ const Admin = () => {
                       <div className="p-4 bg-light rounded-3 border">
                         <h6 className="fw-bold mb-3">Upload New Photos</h6>
                         <form onSubmit={handleCampPhotosUpload}>
-                          <input 
-                            type="file" 
-                            className="form-control mb-3" 
-                            multiple 
+                          <input
+                            type="file"
+                            className="form-control mb-3"
+                            multiple
                             accept="image/*"
                             onChange={(e) => setCampPhotosFiles(e.target.files)}
                             disabled={uploadingPhotos}
@@ -1956,29 +2198,104 @@ const Admin = () => {
                       <th>Eligibility</th>
                       <th>Next Eligible Date</th>
                       <th>Days Remaining</th>
+                      <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {allUsers.map((user, idx) => (
                       <tr key={user._id}>
                         <td className="donor-table-id">#{idx + 1}</td>
-                        <td className="fw-bold">{user.name}</td>
                         <td>
-                          <span className={`status-badge ${user.role === "donor" ? "fulfilled" : user.role === "organizer" ? "active" : "pending"}`}>
-                            {user.role}
-                          </span>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="name"
+                              value={editPlatformUserForm.name || ""}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            <span className="fw-bold">{user.name}</span>
+                          )}
                         </td>
-                        <td><span className="donor-table-group">{user.bloodGroup || "-"}</span></td>
-                        <td>{user.city || "-"}</td>
-                        <td>{user.mobile || user.phone || "-"}</td>
-                        <td>{user.totalDonations || 0}</td>
                         <td>
-                          {user.role === "donor" ? (
-                            <span className={`badge ${
-                              user.donationEligibilityStatus === "Eligible to Donate" 
-                                ? "bg-success" 
-                                : "bg-warning text-dark"
-                            }`}>
+                          {editPlatformUserId === user._id ? (
+                            <select
+                              className="form-select form-select-sm"
+                              name="role"
+                              value={editPlatformUserForm.role || ""}
+                              onChange={handleEditPlatformUserChange}
+                            >
+                              {["donor", "recipient", "organizer", "admin", "blood_bank"].map((r) => (
+                                <option key={r} value={r}>{r}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`status-badge ${user.role === "donor" ? "fulfilled" : user.role === "organizer" ? "active" : "pending"}`}>
+                              {user.role}
+                            </span>
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <select
+                              className="form-select form-select-sm"
+                              name="bloodGroup"
+                              value={editPlatformUserForm.bloodGroup || ""}
+                              onChange={handleEditPlatformUserChange}
+                            >
+                              {["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"].map((bg) => (
+                                <option key={bg} value={bg}>{bg}</option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="donor-table-group">{user.bloodGroup || "-"}</span>
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="city"
+                              value={editPlatformUserForm.city || ""}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            user.city || "-"
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="mobile"
+                              value={editPlatformUserForm.mobile || ""}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            user.mobile || user.phone || "-"
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <input
+                              className="form-control form-control-sm"
+                              name="totalDonations"
+                              type="number"
+                              value={editPlatformUserForm.totalDonations !== undefined ? editPlatformUserForm.totalDonations : 0}
+                              onChange={handleEditPlatformUserChange}
+                            />
+                          ) : (
+                            user.totalDonations || 0
+                          )}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            "-"
+                          ) : user.role === "donor" ? (
+                            <span className={`badge ${user.donationEligibilityStatus === "Eligible to Donate"
+                              ? "bg-success"
+                              : "bg-warning text-dark"
+                              }`}>
                               {user.donationEligibilityStatus || "Eligible"}
                             </span>
                           ) : (
@@ -1986,18 +2303,35 @@ const Admin = () => {
                           )}
                         </td>
                         <td>
-                          {user.role === "donor" && user.nextEligibleDonationDate
+                          {editPlatformUserId === user._id ? (
+                            "-"
+                          ) : user.role === "donor" && user.nextEligibleDonationDate
                             ? new Date(user.nextEligibleDonationDate).toLocaleDateString("en-IN", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
                             : "-"}
                         </td>
                         <td>
-                          {user.role === "donor" 
+                          {editPlatformUserId === user._id ? (
+                            "-"
+                          ) : user.role === "donor"
                             ? (user.daysRemaining > 0 ? `${user.daysRemaining} days` : "0 days")
                             : "-"}
+                        </td>
+                        <td>
+                          {editPlatformUserId === user._id ? (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-success" onClick={() => handleEditPlatformUserSave(user._id)}>✓</button>
+                              <button className="btn btn-sm btn-secondary" onClick={() => setEditPlatformUserId(null)}>✕</button>
+                            </div>
+                          ) : (
+                            <div className="btn-group">
+                              <button className="btn btn-sm btn-outline-primary" onClick={() => handleEditPlatformUserClick(user)}>✏️</button>
+                              <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeletePlatformUser(user._id)}>🗑️</button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -2223,103 +2557,220 @@ const Admin = () => {
                 No enquiries found.
               </div>
             ) : (
-              <div className="row g-4">
-                {filteredEnquiries.map((e) => (
-                  <div className="col-lg-6" key={e._id}>
-                    <div className={`card h-100 shadow-sm border-2 border-${e.status === "pending" ? "warning" : e.status === "approved" ? "success" : "secondary"}`}>
-                      <div className="card-header bg-transparent d-flex justify-content-between align-items-center">
-                        <h5 className="mb-0 text-danger fw-bold">{e.organizationName || e.organizationType || "Camp Enquiry"}</h5>
-                        <span className={`badge ${e.status === "pending" ? "bg-warning text-dark" : e.status === "approved" ? "bg-success" : "bg-secondary"}`}>
-                          {e.status.toUpperCase()}
-                        </span>
-                      </div>
+              <div className="table-responsive bg-white rounded shadow-sm border">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th style={{ minWidth: "200px" }}>Organizer Details</th>
+                      <th style={{ minWidth: "200px" }}>Camp Details</th>
+                      <th style={{ minWidth: "100px" }}>Submitted</th>
+                      <th style={{ minWidth: "100px" }}>Status</th>
+                      <th style={{ minWidth: "200px" }}>Assigned Blood Bank</th>
+                      <th style={{ minWidth: "280px" }}>Approve / Reject Action</th>
+                      <th style={{ minWidth: "120px" }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEnquiries.map((e) => {
+                      const availableBBs = availableBloodBanksMap[e._id] || approvedBloodBanks;
+                      const isAssignedBBUnavailable = e.assignedBloodBank && availableBloodBanksMap[e._id] && !availableBloodBanksMap[e._id].some(bb => bb._id === e.assignedBloodBank._id);
 
-                      <div className="card-body">
-                        <div className="row">
-                          <div className="col-sm-6 mb-3">
-                            <h6 className="text-muted text-uppercase small fw-bold">Organizer Details</h6>
-                            <div className="fw-semibold">{e.organizerName}</div>
+                      return (
+                        <tr key={e._id}>
+                          <td>
+                            <div className="fw-bold text-danger">{e.organizationName || "N/A"}</div>
+                            <div className="fw-semibold text-dark">{e.organizerName}</div>
                             <div className="small text-muted">📧 {e.email}</div>
                             <div className="small text-muted">📞 {e.phone}</div>
-                          </div>
-                          <div className="col-sm-6 mb-3">
-                            <h6 className="text-muted text-uppercase small fw-bold">Camp Details</h6>
-                            <div className="small">📅 {e.preferredDate ? new Date(e.preferredDate).toLocaleDateString() : "TBA"} {e.preferredTime ? `(${e.preferredTime})` : ""}</div>
-                            <div className="small">📍 {e.area || "N/A"}</div>
-                            <div className="small">👥 Expected Donors: {e.expectedDonors || "N/A"}</div>
-                          </div>
-                        </div>
-
-                        {e.message && (
-                          <div className="alert alert-light border small p-2 mb-2 text-dark">
-                            <strong>Msg:</strong> {e.message}
-                          </div>
-                        )}
-                        {e.status === "rejected" && (
-                          <div className="alert alert-danger small p-2">
-                            <strong>Reason:</strong> {e.rejectionReason}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="card-footer bg-transparent">
-                        <div className="d-flex justify-content-between align-items-center mb-2">
-                          <small className="text-muted">
-                            Submitted: {new Date(e.createdAt).toLocaleDateString()}
-                          </small>
-
-                          <div className="btn-group">
-                            {e.status === "approved" && (
-                              <button
-                                className="btn btn-sm btn-outline-warning"
-                                onClick={() => {
-                                  setResetEnquiryModal(e);
-                                  setNewEnquiryPassword("");
-                                }}
-                              >
-                                🔑 Set Password
-                              </button>
+                            <div className="small text-secondary mt-1">Type: {e.organizationType}</div>
+                          </td>
+                          <td>
+                            <div className="small fw-semibold text-dark">
+                              📅 {e.preferredDate ? new Date(e.preferredDate).toLocaleDateString() : "TBA"}
+                              {e.preferredTime ? ` (${e.preferredTime})` : ""}
+                            </div>
+                            <div className="small text-muted">📍 {e.area || "N/A"}</div>
+                            <div className="small text-muted mt-1">👥 {e.expectedDonors || "N/A"} Donors expected</div>
+                            {e.message && (
+                              <div className="small mt-2 p-1 bg-light border rounded text-secondary" style={{ maxWidth: "250px" }}>
+                                <strong>Msg:</strong> {e.message}
+                              </div>
                             )}
-                            <button className="btn btn-sm btn-outline-primary" onClick={() => openEditEnquiryModal(e)}>
-                              ✏️ Edit
-                            </button>
-                            <button className="btn btn-sm btn-outline-danger" onClick={() => handleDeleteEnquiry(e._id)}>
-                              🗑️ Delete
-                            </button>
-                          </div>
-                        </div>
-
-                        {e.status === "pending" && (
-                          <div className="mt-2 pt-2 border-top">
-                            <div className="input-group input-group-sm mb-2">
-                              <span className="input-group-text bg-transparent text-muted">Password</span>
-                              <input
-                                className="form-control"
-                                placeholder="Auto or Manual Password"
-                                value={passwordById[e._id] || ""}
-                                onChange={(ev) => setPasswordById({ ...passwordById, [e._id]: ev.target.value })}
-                              />
-                              <button className="btn btn-success" onClick={() => approveEnquiry(e._id)}>
-                                Approve
+                          </td>
+                          <td>
+                            <div className="small text-muted">{new Date(e.createdAt).toLocaleDateString()}</div>
+                          </td>
+                          <td>
+                            <span
+                              className={`badge ${e.status === "pending"
+                                ? "bg-warning text-dark"
+                                : e.status === "approved"
+                                  ? "bg-success"
+                                  : "bg-secondary"
+                                }`}
+                            >
+                              {e.status.toUpperCase()}
+                            </span>
+                            {e.status === "rejected" && e.rejectionReason && (
+                              <div className="small text-danger mt-1" style={{ maxWidth: "150px" }}>
+                                <strong>Reason:</strong> {e.rejectionReason}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {e.status === "pending" ? (
+                              (e.bloodBankStatus === "none" || e.bloodBankStatus === "rejected") ? (
+                                <div className="d-flex flex-column gap-1">
+                                  {e.bloodBankStatus === "rejected" && (
+                                    <div className="small text-danger mb-1">
+                                      ❌ Rejected by {e.assignedBloodBank?.name || "Blood Bank"}
+                                    </div>
+                                  )}
+                                  <select
+                                    className="form-select form-select-sm"
+                                    value={selectedBloodBankId[e._id] || ""}
+                                    onChange={(ev) => setSelectedBloodBankId({ ...selectedBloodBankId, [e._id]: ev.target.value })}
+                                  >
+                                    <option value="">Select Blood Bank</option>
+                                    {availableBBs.map(bb => (
+                                      <option key={bb._id} value={bb._id}>{bb.name} ({bb.city})</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    className="btn btn-sm btn-outline-danger w-100"
+                                    onClick={() => handleAssignBloodBank(e._id)}
+                                  >
+                                    {e.bloodBankStatus === "rejected" ? "Re-assign" : "Assign BB"}
+                                  </button>
+                                </div>
+                              ) : canReassign(e) ? (
+                                <div className="d-flex flex-column gap-1">
+                                  <div className="fw-semibold small text-dark">
+                                    Assigned: {e.assignedBloodBank?.name}
+                                  </div>
+                                  {isAssignedBBUnavailable && (
+                                    <div className="text-danger small font-bold" style={{ fontSize: "0.7rem" }}>
+                                      ⚠️ Assigned to another camp on this date!
+                                    </div>
+                                  )}
+                                  <div className="text-warning font-bold" style={{ fontSize: "0.75rem" }}>
+                                    ⏱️ Change: {getRemainingTime(e.bloodBankAssignedAt, e.updatedAt)} remaining
+                                  </div>
+                                  <select
+                                    className="form-select form-select-sm"
+                                    value={selectedBloodBankId[e._id] || ""}
+                                    onChange={(ev) => setSelectedBloodBankId({ ...selectedBloodBankId, [e._id]: ev.target.value })}
+                                  >
+                                    <option value="">Change Blood Bank</option>
+                                    {availableBBs.map(bb => (
+                                      <option key={bb._id} value={bb._id}>{bb.name} ({bb.city})</option>
+                                    ))}
+                                  </select>
+                                  <button
+                                    className="btn btn-sm btn-warning w-100 text-dark font-bold"
+                                    onClick={() => handleAssignBloodBank(e._id)}
+                                  >
+                                    Reassign BB
+                                  </button>
+                                </div>
+                              ) : (
+                                <div>
+                                  <div className="fw-semibold small text-dark">{e.assignedBloodBank?.name}</div>
+                                  {isAssignedBBUnavailable && (
+                                    <div className="text-danger small font-bold mt-1" style={{ fontSize: "0.7rem" }}>
+                                      ⚠️ Assigned to another camp on this date!
+                                    </div>
+                                  )}
+                                  {e.bloodBankStatus === "pending" && (
+                                    <span className="badge bg-warning text-dark mt-1">Pending BB Response</span>
+                                  )}
+                                  {e.bloodBankStatus === "accepted" && (
+                                    <span className="badge bg-success mt-1">Confirmed (Resources OK)</span>
+                                  )}
+                                  {e.bloodBankNotes && (
+                                    <div className="small text-muted mt-1" style={{ fontSize: "0.75rem" }}>
+                                      Note: {e.bloodBankNotes}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            ) : (
+                              <div className="fw-semibold small text-dark">
+                                {e.assignedBloodBank?.name || "None Assigned"}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {e.status === "pending" ? (
+                              <div className="d-flex flex-column gap-1">
+                                <div className="input-group input-group-sm">
+                                  <span className="input-group-text bg-light text-muted small">PW</span>
+                                  <input
+                                    className="form-control"
+                                    placeholder="Auto or Manual Password"
+                                    value={passwordById[e._id] || ""}
+                                    onChange={(ev) => setPasswordById({ ...passwordById, [e._id]: ev.target.value })}
+                                  />
+                                  <button
+                                    className="btn btn-success text-white"
+                                    onClick={() => approveEnquiry(e._id)}
+                                    disabled={e.bloodBankStatus !== "accepted"}
+                                    title={e.bloodBankStatus !== "accepted" ? "Awaiting Blood Bank Confirmation" : "Approve"}
+                                  >
+                                    Approve
+                                  </button>
+                                </div>
+                                <div className="input-group input-group-sm">
+                                  <input
+                                    className="form-control"
+                                    placeholder="Rejection reason..."
+                                    value={rejectReasonById[e._id] || ""}
+                                    onChange={(ev) => setRejectReasonById({ ...rejectReasonById, [e._id]: ev.target.value })}
+                                  />
+                                  <button
+                                    className="btn btn-secondary"
+                                    onClick={() => rejectEnquiry(e._id)}
+                                  >
+                                    Reject
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-muted small">No pending action</span>
+                            )}
+                          </td>
+                          <td>
+                            <div className="d-flex flex-column gap-1" style={{ maxWidth: "100px" }}>
+                              {e.status === "approved" && (
+                                <button
+                                  className="btn btn-sm btn-outline-warning w-100"
+                                  onClick={() => {
+                                    setResetEnquiryModal(e);
+                                    setNewEnquiryPassword("");
+                                  }}
+                                >
+                                  🔑 Password
+                                </button>
+                              )}
+                              <button
+                                className="btn btn-sm btn-outline-primary w-100"
+                                onClick={() => openEditEnquiryModal(e)}
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                className="btn btn-sm btn-outline-danger w-100"
+                                onClick={() => handleDeleteEnquiry(e._id)}
+                              >
+                                🗑️ Delete
                               </button>
                             </div>
-                            <div className="input-group input-group-sm">
-                              <input
-                                className="form-control"
-                                placeholder="Rejection reason..."
-                                value={rejectReasonById[e._id] || ""}
-                                onChange={(ev) => setRejectReasonById({ ...rejectReasonById, [e._id]: ev.target.value })}
-                              />
-                              <button className="btn btn-secondary" onClick={() => rejectEnquiry(e._id)}>
-                                Reject
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -2330,87 +2781,17 @@ const Admin = () => {
             ============================================================ */}
         {currentView === "blood-requests" && (
           <div className="animate-fade-in space-y-6 max-w-7xl mx-auto pb-12">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-3xl font-black text-slate-800 font-cinzel mb-1">Emergency Blood Requests</h2>
-                <p className="text-slate-500 font-medium">Manage, filter, and notify donors for blood requests</p>
+                <h2 className="text-3xl font-black text-slate-800 font-cinzel mb-2">Emergency Blood Requests</h2>
+                <p className="text-slate-500 font-medium">Manage and update status of blood requests</p>
               </div>
               <button
-                onClick={() => fetchBloodRequests({ state: brFilterState, bloodGroup: brFilterBloodGroup, status: brFilterStatus })}
+                onClick={fetchBloodRequests}
                 className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition-colors flex items-center gap-2"
               >
                 🔄 Refresh
               </button>
-            </div>
-
-            {/* Filter Bar */}
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap gap-3 items-end">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Search Patient / City</label>
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={brSearchQuery}
-                  onChange={(e) => setBrSearchQuery(e.target.value)}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-red-400 bg-slate-50 min-w-[180px]"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">State</label>
-                <select
-                  value={brFilterState}
-                  onChange={(e) => { setBrFilterState(e.target.value); fetchBloodRequests({ state: e.target.value, bloodGroup: brFilterBloodGroup, status: brFilterStatus }); }}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-red-400 bg-slate-50 cursor-pointer"
-                >
-                  <option value="">All States</option>
-                  {["Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat","Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh","Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan","Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal","Delhi","Jammu & Kashmir","Ladakh","Puducherry","Chandigarh","Andaman & Nicobar Islands","Dadra & Nagar Haveli","Daman & Diu","Lakshadweep"].map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Blood Group</label>
-                <select
-                  value={brFilterBloodGroup}
-                  onChange={(e) => { setBrFilterBloodGroup(e.target.value); fetchBloodRequests({ state: brFilterState, bloodGroup: e.target.value, status: brFilterStatus }); }}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-red-400 bg-slate-50 cursor-pointer"
-                >
-                  <option value="">All Groups</option>
-                  {["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(bg => (
-                    <option key={bg} value={bg}>{bg}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status</label>
-                <select
-                  value={brFilterStatus}
-                  onChange={(e) => { setBrFilterStatus(e.target.value); fetchBloodRequests({ state: brFilterState, bloodGroup: brFilterBloodGroup, status: e.target.value }); }}
-                  className="px-3 py-2 rounded-lg border border-slate-200 text-sm outline-none focus:border-red-400 bg-slate-50 cursor-pointer"
-                >
-                  <option value="">All Statuses</option>
-                  <option value="pending">Pending</option>
-                  <option value="active">Active</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="completed">Completed</option>
-                </select>
-              </div>
-              {(brFilterState || brFilterBloodGroup || brFilterStatus || brSearchQuery) && (
-                <button
-                  onClick={() => { setBrFilterState(""); setBrFilterBloodGroup(""); setBrFilterStatus(""); setBrSearchQuery(""); fetchBloodRequests(); }}
-                  className="px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-red-600 text-xs font-bold hover:bg-red-100 transition-colors"
-                >
-                  ✕ Clear Filters
-                </button>
-              )}
-              <div className="ml-auto text-sm font-semibold text-slate-500">
-                {bloodRequests.filter(r => {
-                  if (!brSearchQuery) return true;
-                  const q = brSearchQuery.toLowerCase();
-                  return (r.patientName||r.name||"").toLowerCase().includes(q) || (r.city||"").toLowerCase().includes(q) || (r.hospitalName||r.hospital||"").toLowerCase().includes(q);
-                }).length} results
-              </div>
             </div>
 
             {loadingBloodRequests ? (
@@ -2420,123 +2801,102 @@ const Admin = () => {
             ) : bloodRequests.length === 0 ? (
               <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm">
                 <div className="text-6xl mb-4">🙌</div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">No Requests Found</h3>
-                <p className="text-slate-500">Try clearing your filters or check back later.</p>
+                <h3 className="text-xl font-bold text-slate-800 mb-2">No Active Requests</h3>
+                <p className="text-slate-500">There are currently no emergency blood requests.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 gap-4">
-                {bloodRequests
-                  .filter(r => {
-                    if (!brSearchQuery) return true;
-                    const q = brSearchQuery.toLowerCase();
-                    return (r.patientName||r.name||"").toLowerCase().includes(q) || (r.city||"").toLowerCase().includes(q) || (r.hospitalName||r.hospital||"").toLowerCase().includes(q);
-                  })
-                  .map((req) => (
-                  <div key={req._id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-start justify-between">
+                {bloodRequests.map((req) => (
+                  <div key={req._id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                     <div className="flex-1 space-y-3">
-                      {/* Top badges row */}
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-bold bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full border border-slate-200">
-                          ID: {req.requestId || req._id?.slice(-6)}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="text-sm font-bold bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">
+                          ID: {req.requestId}
                         </span>
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
-                          req.urgency === 'urgent' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
-                        }`}>
+                        <span className={`text-sm font-bold px-3 py-1 rounded-full border ${req.urgency === 'urgent' ? 'bg-red-50 text-red-600 border-red-200' : 'bg-blue-50 text-blue-600 border-blue-200'
+                          }`}>
                           {req.urgency === 'urgent' ? '🚨 Urgent' : '📅 Planned'}
                         </span>
-                        <span className="text-xs font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200">
-                          🩸 {req.bloodGroup} × {req.unitsNeeded || req.units || 1} ({req.bloodComponent || "Not specified"})
+                        <span className="text-sm font-bold bg-amber-50 text-amber-600 px-3 py-1 rounded-full border border-amber-200">
+                          {req.bloodGroup} (x{req.units}) — {req.bloodComponent || "Not specified"}
                         </span>
-                        {req.state && (
-                          <span className="text-xs font-bold bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-full border border-indigo-200">
-                            📌 {req.state}
-                          </span>
-                        )}
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${
-                          req.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
-                          req.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                          req.status === 'accepted' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                          'bg-slate-50 text-slate-600 border-slate-200'
-                        }`}>
-                          {req.status === 'active' ? '📡 Active' : req.status === 'pending' ? '⏳ Pending' : req.status === 'accepted' ? '🤝 Accepted' : '✅ Completed'}
-                        </span>
-                        <span className="text-[10px] text-slate-400 font-medium ml-auto">
+                        <span className="text-xs text-slate-400 font-medium">
                           {new Date(req.createdAt).toLocaleString()}
                         </span>
                       </div>
 
-                      {/* Patient & Hospital */}
                       <div>
-                        <h3 className="text-lg font-bold text-slate-800">{req.patientName || req.name}</h3>
-                        <p className="text-sm text-slate-500 font-medium">🏥 {req.hospitalName || req.hospital}, {req.hospitalArea || req.area || ""} — 📍 {req.city}{req.state ? `, ${req.state}` : ""}</p>
-                        {req.mobile && <p className="text-sm text-slate-600 mt-0.5">📞 Requester: <span className="font-semibold">{req.mobile}</span></p>}
+                        <h3 className="text-xl font-bold text-slate-800">{req.patientName}</h3>
+                        <p className="text-sm text-slate-500 font-medium">📍 {req.hospital}, {req.city}</p>
                       </div>
 
-                      {req.additionalInfo && (
-                        <div className="text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600 italic">
-                          &ldquo;{req.additionalInfo}&rdquo;
-                        </div>
-                      )}
+                      <div className="text-sm text-slate-600">
+                        <span className="font-semibold text-slate-800">Requested by:</span> {req.recipient?.name} ({req.recipient?.mobile})
+                      </div>
 
                       {req.acceptedBy && (
-                        <div className="text-sm p-3 bg-green-50 border border-green-200 rounded-lg">
-                          <div className="font-semibold text-green-800 mb-1">✅ Donor Details (Accepted)</div>
-                          <div className="text-green-700">Name: {req.acceptedBy.name}</div>
-                          <div className="text-green-700">Contact: {req.acceptedBy.mobile}</div>
+                        <div className="text-sm mt-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                          <div className="font-semibold text-green-800 mb-1">Donor Details (Accepted)</div>
+                          <div className="text-green-700"><span className="font-semibold">Name:</span> {req.acceptedBy.name}</div>
+                          <div className="text-green-700"><span className="font-semibold">Contact:</span> {req.acceptedBy.mobile}</div>
                           {(req.acceptedBy.city || req.acceptedBy.state) && (
                             <div className="text-green-700">
-                              Location: {req.acceptedBy.city || ""}{req.acceptedBy.city && req.acceptedBy.state ? ", " : ""}{req.acceptedBy.state || ""}
+                              <span className="font-semibold">Location:</span> {req.acceptedBy.city || ""}{req.acceptedBy.city && req.acceptedBy.state ? ", " : ""}{req.acceptedBy.state || ""}
                             </div>
                           )}
-                          {req.acceptedAt && <div className="text-green-700">Accepted On: {new Date(req.acceptedAt).toLocaleString()}</div>}
-                          {req.otp && <div className="text-green-700 mt-1 font-mono">OTP: <strong>{req.otp}</strong></div>}
+                          {req.acceptedAt && <div className="text-green-700"><span className="font-semibold">Accepted On:</span> {new Date(req.acceptedAt).toLocaleString()}</div>}
+                          {req.otp && <div className="text-green-700 mt-1 font-mono"><span className="font-semibold">OTP:</span> <strong>{req.otp}</strong></div>}
                         </div>
                       )}
-                    </div>
 
-                    {/* Right Control Panel */}
-                    <div className="w-full md:w-52 flex flex-col gap-3 shrink-0">
-                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-3">
-                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Status Control</div>
-                        <select
-                          value={req.status}
-                          onChange={async (e) => {
-                            const newStatus = e.target.value;
-                            if (window.confirm(`Change status to "${newStatus}"?`)) {
-                              try {
-                                await adminService.updateBloodRequestStatus(req.requestId || req._id, newStatus);
-                                fetchBloodRequests({ state: brFilterState, bloodGroup: brFilterBloodGroup, status: brFilterStatus });
-                                toast.success("Status updated!");
-                              } catch (err) {
-                                toast.error("Error updating status");
-                              }
+                      {req.acceptedByBloodBank && (
+                        <div className="text-sm mt-2 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                          <div className="font-semibold text-purple-800 mb-1">Blood Bank Details (Accepted)</div>
+                          <div className="text-purple-700"><span className="font-semibold">Name:</span> {req.acceptedByBloodBank.name}</div>
+                          <div className="text-purple-700"><span className="font-semibold">Contact:</span> {req.acceptedByBloodBank.mobile} ({req.acceptedByBloodBank.managerName || "Manager"})</div>
+                          {req.acceptedAt && <div className="text-purple-700"><span className="font-semibold">Accepted On:</span> {new Date(req.acceptedAt).toLocaleString()}</div>}
+                          {req.otp && <div className="text-purple-700 mt-1 font-mono"><span className="font-semibold">OTP:</span> <strong>{req.otp}</strong></div>}
+                        </div>
+                      )}
+
+                      {req.additionalInfo && (
+                        <div className="text-sm bg-slate-50 p-3 rounded-lg border border-slate-100 text-slate-600 italic mt-2">
+                          "{req.additionalInfo}"
+                        </div>
+                      )}                    </div>
+
+                    <div className="w-full md:w-auto bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-3 min-w-[200px]">
+                      <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Status Control</div>
+
+                      <select
+                        value={req.status}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          if (window.confirm(`Change status to ${newStatus}?`)) {
+                            try {
+                              await adminService.updateBloodRequestStatus(req.requestId, newStatus);
+                              fetchBloodRequests();
+                              toast.success("Status updated!");
+                            } catch (err) {
+                              toast.error("Error updating status");
                             }
-                          }}
-                          className={`w-full p-2.5 rounded-lg border-2 font-bold text-xs outline-none cursor-pointer appearance-none ${
-                            req.status === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700' :
-                            req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700' :
-                            req.status === 'accepted' ? 'border-purple-200 bg-purple-50 text-purple-700' :
-                            'border-green-200 bg-green-50 text-green-700'
+                          }
+                        }}
+                        className={`w-full p-2.5 rounded-lg border-2 font-bold text-sm outline-none cursor-pointer appearance-none ${req.status === 'pending' ? 'border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-400' :
+                          req.status === 'active' ? 'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400' :
+                            req.status === 'accepted' ? 'border-purple-200 bg-purple-50 text-purple-700 focus:border-purple-400' :
+                              'border-green-200 bg-green-50 text-green-700 focus:border-green-400'
                           }`}
-                        >
-                          <option value="pending">⏳ Pending Review</option>
-                          <option value="active">📡 Active</option>
-                          <option value="accepted">🤝 Accepted</option>
-                          <option value="completed">✅ Completed</option>
-                        </select>
-                      </div>
-
-                      {/* Notify Button */}
-                      <button
-                        onClick={() => handleNotifyDonors(req.requestId || req._id)}
-                        disabled={notifyingId === (req.requestId || req._id)}
-                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-red-600 to-rose-500 text-white text-xs font-bold shadow hover:from-red-500 hover:to-rose-400 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                       >
-                        {notifyingId === (req.requestId || req._id) ? (
-                          <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : "📣"}
-                        {notifyingId === (req.requestId || req._id) ? "Notifying..." : "Notify Donors"}
-                      </button>
+                        <option value="pending">⏳ Pending Review</option>
+                        <option value="active">📡 Active (Notifying Donors/blood bank)</option>
+                        <option value="accepted">🤝 Accepted (Blood Arranged)</option>
+                        <option value="completed">✅ Donation Completed</option>
+                      </select>
+
+                      <div className="text-[10px] text-slate-400 font-medium text-center">
+                        Changes reflect live for the recipient
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -2562,7 +2922,7 @@ const Admin = () => {
                 <table className="premium-table">
                   <thead>
                     <tr>
-                      <th>#</th>
+                      <th>ID</th>
                       <th>Name</th>
                       <th>Contact / Email</th>
                       <th>Status</th>
@@ -2574,7 +2934,7 @@ const Admin = () => {
                     {organizersList.length > 0 ? (
                       organizersList.map((org, index) => (
                         <tr key={org._id}>
-                          <td>{index + 1}</td>
+                          <td style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>{org._id}</td>
                           <td>
                             {editOrganizerId === org._id ? (
                               <input
@@ -2699,11 +3059,9 @@ const Admin = () => {
           </div>
         )}
 
-        {/* --- UI/UX / Personalized Homepage Content Manager --- */}
+        {/* --- 6. UI/UX Customizer View --- */}
         {currentView === "uiux" && (
-          <div className="dashboard-details-grid pt-4">
-            <HomeContentAdmin />
-          </div>
+          <HomeContentAdmin />
         )}
 
         {/* --- 9. Blood Request Background Tab View --- */}
@@ -2713,22 +3071,19 @@ const Admin = () => {
           </div>
         )}
 
-        <footer className="copyright-footer">
-          © 2026 LifeDrop Admin Dashboard. All rights reserved.
-        </footer>
-        {/* --- 9. Blood Bank Requests --- */}
-        {currentView === "blood-bank-requests" && (
-          <div className="fade-in">
-            <AdminBloodBankRequests />
+        {/* --- City Management Tab View --- */}
+        {currentView === "cities" && (
+          <div className="dashboard-details-grid pt-4">
+            <CityManagementAdmin />
           </div>
         )}
 
-        {/* --- 10. Blood Banks --- */}
-        {currentView === "blood-banks" && (
-          <div className="fade-in">
-            <AdminBloodBanks />
-          </div>
-        )}
+
+
+        <footer className="copyright-footer">
+          © 2026 LifeDrop Admin Dashboard. All rights reserved.
+        </footer>
+
       </main>
 
       {/* --- ADD CAMP MODAL --- */}

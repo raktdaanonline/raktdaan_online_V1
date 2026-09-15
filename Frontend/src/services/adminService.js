@@ -65,6 +65,10 @@ const adminService = {
     const res = await api.get("/blood-bank/all", { params });
     return res.data;
   },
+  getBloodBankStats: async () => {
+    const res = await api.get("/blood-bank/stats");
+    return res.data;
+  },
   getPendingBloodBanks: async () => {
     const res = await api.get("/blood-bank/all?status=pending");
     return res.data;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key, ChevronDown, Edit3, Trash2, Save, CheckCircle2, Navigation } from "lucide-react";
+import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key, ChevronDown, ChevronLeft, ChevronRight, Edit3, Trash2, Save, CheckCircle2, Navigation } from "lucide-react";
 import adminService from "../services/adminService";
 import AdminInviteBloodBank from "./AdminInviteBloodBank";
 
@@ -21,6 +21,17 @@ export default function AdminBloodBanks() {
 
   const [selectedCity, setSelectedCity] = useState("all");
   const [citiesList, setCitiesList] = useState([]);
+
+  // Backend Pagination State (15 items per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 15,
+    totalPages: 1,
+    hasNextPage: false,
+    hasPrevPage: false,
+  });
 
   // Edit Blood Bank Modal State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -47,9 +58,70 @@ export default function AdminBloodBanks() {
     isVerified: true,
   });
 
+  // Status Summary Stats for Badge and Cards
+  const [stats, setStats] = useState({
+    total: 0,
+    active: 0,
+    pending: 0,
+    invited: 0,
+    rejected: 0,
+    suspended: 0,
+  });
+
+  const fetchStats = async () => {
+    try {
+      const res = await adminService.getBloodBankStats();
+      if (res && res.success && res.stats) {
+        setStats(res.stats);
+      }
+    } catch (err) {
+      console.warn("Failed loading blood bank stats in AdminBloodBanks:", err);
+    }
+  };
+
+  const fetchBloodBanks = async (page = currentPage, tab = activeTab, city = selectedCity, query = searchQuery) => {
+    setLoading(true);
+    try {
+      const params = {
+        page,
+        limit: 15,
+        status: tab,
+      };
+      if (city && city !== "all") params.city = city;
+      if (query && query.trim()) params.search = query.trim();
+
+      const res = await adminService.getBloodBanks(params);
+      if (res.success) {
+        setBloodBanks(res.data || []);
+        if (res.pagination) {
+          setPagination(res.pagination);
+          setCurrentPage(res.pagination.page);
+        }
+      }
+    } catch (err) {
+      toast.error("Failed to fetch blood banks");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    fetchBloodBanks();
-  }, [activeTab]);
+    fetchStats();
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    fetchBloodBanks(1, activeTab, selectedCity, searchQuery);
+  }, [activeTab, selectedCity]);
+
+  // Debounced search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setCurrentPage(1);
+      fetchBloodBanks(1, activeTab, selectedCity, searchQuery);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     adminService.getCities().then((res) => {
@@ -58,6 +130,12 @@ export default function AdminBloodBanks() {
       }
     }).catch((err) => console.warn("Failed loading cities list in blood banks:", err));
   }, []);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || (pagination.totalPages && newPage > pagination.totalPages) || newPage === currentPage) return;
+    setCurrentPage(newPage);
+    fetchBloodBanks(newPage, activeTab, selectedCity, searchQuery);
+  };
 
   const copyToClipboard = async (text) => {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -116,19 +194,6 @@ export default function AdminBloodBanks() {
     }
   };
 
-  const fetchBloodBanks = async () => {
-    setLoading(true);
-    try {
-      const res = await adminService.getBloodBanks({ status: activeTab });
-      if (res.success) {
-        setBloodBanks(res.data);
-      }
-    } catch (err) {
-      toast.error("Failed to fetch blood banks");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleOpenEditModal = (bank) => {
     setEditingBank(bank);
@@ -195,6 +260,7 @@ export default function AdminBloodBanks() {
           setSelectedBank(res.data);
         }
         fetchBloodBanks();
+        fetchStats();
       } else {
         toast.error(res.message || "Failed to update blood bank");
       }
@@ -215,6 +281,7 @@ export default function AdminBloodBanks() {
         if (selectedBank?._id === id) setSelectedBank(null);
         if (editingBank?._id === id) setShowEditModal(false);
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error deleting blood bank");
@@ -232,6 +299,7 @@ export default function AdminBloodBanks() {
         toast.success(res.message || "Approved successfully!");
         setSelectedBank(null);
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error approving blood bank");
@@ -254,6 +322,7 @@ export default function AdminBloodBanks() {
         setIsRejecting(false);
         setRejectionReason("");
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error rejecting blood bank");
@@ -276,6 +345,7 @@ export default function AdminBloodBanks() {
         setIsSuspending(false);
         setSuspensionReason("");
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error suspending blood bank");
@@ -293,6 +363,7 @@ export default function AdminBloodBanks() {
         toast.success(res.message || "Blood bank reactivated successfully.");
         setSelectedBank(null);
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error reactivating blood bank");
@@ -308,6 +379,7 @@ export default function AdminBloodBanks() {
       if (res.success) {
         toast.success(res.message || "Invitation resent successfully!");
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error resending invitation");
@@ -332,6 +404,7 @@ export default function AdminBloodBanks() {
           if (updated) setSelectedBank(updated);
         }
         fetchBloodBanks();
+        fetchStats();
       }
     } catch (err) {
       toast.error(err.response?.data?.message || "Error updating status");
@@ -413,19 +486,133 @@ export default function AdminBloodBanks() {
         </div>
       </div>
 
-      {/* Tabs Row */}
-      <div className="flex border-b border-zinc-800 mb-6 overflow-x-auto gap-2">
-        {["all", "pending", "active", "invited", "rejected", "suspended"].map((tab) => (
+      {/* Top Stat Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        {/* Total Card */}
+        <div
+          onClick={() => setActiveTab("all")}
+          className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === "all"
+              ? "bg-red-500/10 border-red-500/40 shadow-lg shadow-red-500/10"
+              : "bg-[#11111f] border-zinc-800/80 hover:border-zinc-700 hover:bg-[#16162a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">Total Banks</span>
+            <Building className="w-4 h-4 text-zinc-400" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-white">{stats.total}</span>
+            <span className="text-[10px] text-zinc-500 font-semibold">Registered</span>
+          </div>
+        </div>
+
+        {/* Active Card */}
+        <div
+          onClick={() => setActiveTab("active")}
+          className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === "active"
+              ? "bg-emerald-500/10 border-emerald-500/40 shadow-lg shadow-emerald-500/10"
+              : "bg-[#11111f] border-zinc-800/80 hover:border-zinc-700 hover:bg-[#16162a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">Active / Approved</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-emerald-400">{stats.active}</span>
+            <span className="text-[10px] text-emerald-500/70 font-semibold">Operational</span>
+          </div>
+        </div>
+
+        {/* Pending Card */}
+        <div
+          onClick={() => setActiveTab("pending")}
+          className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === "pending"
+              ? "bg-amber-500/10 border-amber-500/40 shadow-lg shadow-amber-500/10"
+              : "bg-[#11111f] border-zinc-800/80 hover:border-zinc-700 hover:bg-[#16162a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">Pending Review</span>
+            <Clock className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-amber-400">{stats.pending}</span>
+            <span className="text-[10px] text-amber-500/70 font-semibold">Need Action</span>
+          </div>
+        </div>
+
+        {/* Invited Card */}
+        <div
+          onClick={() => setActiveTab("invited")}
+          className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === "invited"
+              ? "bg-blue-500/10 border-blue-500/40 shadow-lg shadow-blue-500/10"
+              : "bg-[#11111f] border-zinc-800/80 hover:border-zinc-700 hover:bg-[#16162a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">Invited</span>
+            <ExternalLink className="w-4 h-4 text-blue-400" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-blue-400">{stats.invited}</span>
+            <span className="text-[10px] text-blue-500/70 font-semibold">Invite Sent</span>
+          </div>
+        </div>
+
+        {/* Suspended/Rejected Card */}
+        <div
+          onClick={() => setActiveTab("suspended")}
+          className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+            activeTab === "suspended" || activeTab === "rejected"
+              ? "bg-rose-500/10 border-rose-500/40 shadow-lg shadow-rose-500/10"
+              : "bg-[#11111f] border-zinc-800/80 hover:border-zinc-700 hover:bg-[#16162a]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-rose-400 uppercase tracking-wider">Inactive / Susp</span>
+            <Ban className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl font-black text-rose-400">{(stats.suspended || 0) + (stats.rejected || 0)}</span>
+            <span className="text-[10px] text-rose-500/70 font-semibold">{stats.suspended || 0} Susp / {stats.rejected || 0} Rej</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs Row with Count Badges */}
+      <div className="flex border-b border-zinc-800 mb-6 overflow-x-auto gap-1.5 pb-1">
+        {[
+          { key: "all", label: "ALL", count: stats.total },
+          { key: "pending", label: "PENDING", count: stats.pending, alert: stats.pending > 0 },
+          { key: "active", label: "ACTIVE", count: stats.active },
+          { key: "invited", label: "INVITED", count: stats.invited },
+          { key: "rejected", label: "REJECTED", count: stats.rejected },
+          { key: "suspended", label: "SUSPENDED", count: stats.suspended },
+        ].map((t) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === tab 
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`px-3.5 py-2 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+              activeTab === t.key 
                 ? "border-red-500 text-red-400 bg-red-500/5" 
                 : "border-transparent text-zinc-400 hover:text-white"
             }`}
           >
-            {tab}
+            <span>{t.label}</span>
+            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+              activeTab === t.key
+                ? "bg-red-500 text-white"
+                : t.alert
+                  ? "bg-amber-500/20 text-amber-400 border border-amber-500/30 animate-pulse"
+                  : "bg-zinc-800 text-zinc-400"
+            }`}>
+              {t.count ?? 0}
+            </span>
           </button>
         ))}
       </div>
@@ -450,7 +637,7 @@ export default function AdminBloodBanks() {
               </tr>
             </thead>
             <tbody>
-              {filteredBanks.map((bank) => {
+              {bloodBanks.map((bank) => {
                 const expiring = isLicenseExpiringSoon(bank.licenseExpiryDate);
                 const expired = isLicenseExpired(bank.licenseExpiryDate);
                 
@@ -586,7 +773,7 @@ export default function AdminBloodBanks() {
                   </tr>
                 );
               })}
-              {filteredBanks.length === 0 && (
+              {bloodBanks.length === 0 && (
                 <tr>
                   <td colSpan="6" className="text-center py-10 text-zinc-500 text-xs italic">
                     No blood banks found under the selected criteria.
@@ -595,6 +782,67 @@ export default function AdminBloodBanks() {
               )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Backend Pagination Controls (15 items per page) */}
+      {pagination.total > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-5 mt-4 border-t border-zinc-800 text-xs text-zinc-400">
+          <div className="flex items-center gap-2">
+            <span>
+              Showing <strong className="text-zinc-200">{((currentPage - 1) * pagination.limit) + 1}</strong> to{" "}
+              <strong className="text-zinc-200">{Math.min(currentPage * pagination.limit, pagination.total)}</strong> of{" "}
+              <strong className="text-white font-bold">{pagination.total}</strong> blood banks
+            </span>
+            <span className="text-zinc-700">|</span>
+            <span className="text-zinc-500 text-[11px]">15 per page</span>
+          </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                disabled={!pagination.hasPrevPage || loading}
+                onClick={() => handlePageChange(currentPage - 1)}
+                className="h-8 px-3 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 font-semibold cursor-pointer"
+              >
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: pagination.totalPages }, (_, i) => i + 1)
+                  .filter((p) => {
+                    return p === 1 || p === pagination.totalPages || Math.abs(p - currentPage) <= 1;
+                  })
+                  .map((p, idx, arr) => {
+                    const showEllipsis = idx > 0 && p - arr[idx - 1] > 1;
+                    return (
+                      <React.Fragment key={p}>
+                        {showEllipsis && <span className="px-1 text-zinc-600">...</span>}
+                        <button
+                          disabled={loading}
+                          onClick={() => handlePageChange(p)}
+                          className={`h-8 min-w-[32px] px-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                            p === currentPage
+                              ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                              : "border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 hover:text-white"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      </React.Fragment>
+                    );
+                  })}
+              </div>
+
+              <button
+                disabled={!pagination.hasNextPage || loading}
+                onClick={() => handlePageChange(currentPage + 1)}
+                className="h-8 px-3 rounded-lg border border-zinc-700 bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 disabled:opacity-40 disabled:pointer-events-none transition-all flex items-center gap-1 font-semibold cursor-pointer"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

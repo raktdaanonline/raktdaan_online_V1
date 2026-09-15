@@ -91,6 +91,18 @@ const Admin = () => {
   const [loadingBloodRequests, setLoadingBloodRequests] = useState(false);
   const [totalPlatformUsers, setTotalPlatformUsers] = useState(0);
 
+  // --- Blood Banks Dashboard States ---
+  const [bloodBankStats, setBloodBankStats] = useState({
+    total: 0,
+    active: 0,
+    pending: 0,
+    invited: 0,
+    rejected: 0,
+    suspended: 0,
+  });
+  const [cityDistribution, setCityDistribution] = useState([]);
+  const [loadingBloodBankStats, setLoadingBloodBankStats] = useState(false);
+
   // Donor Edit states
   const [editDonorId, setEditDonorId] = useState(null);
   const [editForm, setEditForm] = useState({});
@@ -233,6 +245,7 @@ const Admin = () => {
     fetchThemeSettings();
     fetchBloodRequests();
     fetchTotalUsers();
+    fetchBloodBankStats();
   }, []);
 
   const [timeTicker, setTimeTicker] = useState(Date.now());
@@ -270,6 +283,27 @@ const Admin = () => {
       console.error("Failed to load total users", err);
     }
   };
+
+  const fetchBloodBankStats = async () => {
+    setLoadingBloodBankStats(true);
+    try {
+      const res = await adminService.getBloodBankStats();
+      if (res && res.success) {
+        if (res.stats) setBloodBankStats(res.stats);
+        if (res.cityDistribution) setCityDistribution(res.cityDistribution);
+      }
+    } catch (err) {
+      console.error("Failed to load blood bank stats in Admin:", err);
+    } finally {
+      setLoadingBloodBankStats(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentView === "dashboard") {
+      fetchBloodBankStats();
+    }
+  }, [currentView]);
 
   const fetchAllUsers = async () => {
     setLoadingAllUsers(true);
@@ -1734,10 +1768,29 @@ const Admin = () => {
                   <span className="stat-trend up">▲ 6.1%</span>
                 </div>
               </div>
+
+              <div
+                className="stat-card"
+                onClick={() => setCurrentView("blood-banks")}
+                style={{ cursor: "pointer" }}
+              >
+                <div className="stat-icon-container" style={{ backgroundColor: "#fef2f2", color: "#e11d48", fontSize: "1.5rem" }}>
+                  🏥
+                </div>
+                <div className="stat-details">
+                  <span className="stat-label">Total Blood Banks</span>
+                  <span className="stat-value">{bloodBankStats.total || 0}</span>
+                  <span className="stat-trend up" style={{ color: "#16a34a", fontSize: "0.75rem", fontWeight: 700 }}>
+                    {bloodBankStats.active || 0} Active • {bloodBankStats.pending || 0} Pending
+                  </span>
+                </div>
+              </div>
             </div>
 
 
-            <div className="dashboard-details-grid">
+            <div className="dashboard-details-grid" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+              
+              {/* Card 1: Live Blood Requests */}
               <div className="table-card">
                 <div className="table-header">
                   <h3 className="table-title">Live Blood Requests (Last 24 Hours)</h3>
@@ -1791,6 +1844,100 @@ const Admin = () => {
                     );
                   })()}
                 </div>
+              </div>
+
+              {/* Card 2: Listings by City (Purple Grid Blocks) */}
+              <div className="table-card" style={{ padding: "1.75rem" }}>
+                <div className="table-header" style={{ marginBottom: "1.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                    <h3 className="table-title" style={{ fontSize: "1.1rem", fontWeight: 700, color: "#1e293b", margin: 0 }}>
+                      Listings by City
+                    </h3>
+                  </div>
+                  <button className="view-all-link" onClick={() => setCurrentView("blood-banks")}>
+                    Manage All →
+                  </button>
+                </div>
+
+                {loadingBloodBankStats ? (
+                  <p className="text-center py-8 text-muted">Loading city listings...</p>
+                ) : cityDistribution.filter((item) => (item.total || 0) > 0).length === 0 ? (
+                  <p className="text-center py-8 text-muted">No cities with registered blood banks found.</p>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))",
+                      gap: "14px",
+                      width: "100%",
+                    }}
+                  >
+                    {cityDistribution
+                      .filter((item) => (item.total || 0) > 0)
+                      .map((item) => (
+                      <div
+                        key={item._id}
+                        onClick={() => setCurrentView("blood-banks")}
+                        style={{
+                          background: "#5b4df3",
+                          backgroundColor: "#5b4df3",
+                          borderRadius: "14px",
+                          padding: "18px 8px 14px 8px",
+                          textAlign: "center",
+                          color: "#ffffff",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease-in-out",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minHeight: "92px",
+                          boxShadow: "0 4px 14px rgba(91, 77, 243, 0.28)",
+                          userSelect: "none",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-4px)";
+                          e.currentTarget.style.boxShadow = "0 10px 22px rgba(91, 77, 243, 0.45)";
+                          e.currentTarget.style.backgroundColor = "#4f3fed";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "0 4px 14px rgba(91, 77, 243, 0.28)";
+                          e.currentTarget.style.backgroundColor = "#5b4df3";
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: "1.75rem",
+                            fontWeight: 800,
+                            lineHeight: "1.1",
+                            color: "#ffffff",
+                            letterSpacing: "-0.02em",
+                          }}
+                        >
+                          {item.total}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.8rem",
+                            fontWeight: 500,
+                            color: "rgba(255, 255, 255, 0.95)",
+                            marginTop: "6px",
+                            textTransform: "capitalize",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            maxWidth: "100%",
+                            padding: "0 4px",
+                          }}
+                          title={item.cityName || item._id}
+                        >
+                          {item.cityName || item._id}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>

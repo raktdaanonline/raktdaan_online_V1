@@ -73,6 +73,10 @@ const adminService = {
     const res = await api.get("/blood-bank/all", { params });
     return res.data;
   },
+  getBloodBankStats: async () => {
+    const res = await api.get("/blood-bank/stats");
+    return res.data;
+  },
   getAvailableBloodBanks: async (campDate, excludeEnquiryId) => {
     const res = await api.get("/admin/blood-banks/available", {
       params: { campDate, excludeEnquiryId }

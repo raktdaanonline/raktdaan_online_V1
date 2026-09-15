@@ -5,6 +5,7 @@ import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import BloodBank from "../models/BloodBank.js";
+import City from "../models/City.js";
 import User from "../models/User.js";
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { generateToken, hashToken } from "../utils/tokenUtils.js";
@@ -378,13 +379,90 @@ router.get("/verify-password-token", async (req, res) => {
 });
 
 /* ======================================================
-   API 4: Admin — List Blood Banks
-   GET /api/blood-bank/all?status=pending
+   API: Admin — Blood Banks Summary & City-wise Stats
+   GET /api/blood-bank/stats
+   Auth: admin
+====================================================== */
+router.get("/stats", verifyToken, async (req, res) => {
+  try {
+    const total = await BloodBank.countDocuments();
+
+    // Status aggregation
+    const statusCounts = await BloodBank.aggregate([
+      {
+        $group: {
+          _id: "$status",
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const counts = {
+      total,
+      active: 0,
+      pending: 0,
+      invited: 0,
+      rejected: 0,
+      suspended: 0,
+    };
+
+    statusCounts.forEach((item) => {
+      if (item._id === "active" || item._id === "approved") {
+        counts.active += item.count;
+      } else if (item._id === "pending") {
+        counts.pending += item.count;
+      } else if (item._id === "invited") {
+        counts.invited += item.count;
+      } else if (item._id === "rejected") {
+        counts.rejected += item.count;
+      } else if (item._id === "suspended" || item._id === "blocked") {
+        counts.suspended += item.count;
+      }
+    });
+
+    // City distribution aggregation (Only cities that have blood banks)
+    const cityDistribution = await BloodBank.aggregate([
+      {
+        $match: {
+          city: { $exists: true, $ne: "" },
+        },
+      },
+      {
+        $group: {
+          _id: { $toLower: { $ifNull: ["$city", "unknown"] } },
+          cityName: { $first: "$city" },
+          total: { $sum: 1 },
+          active: { $sum: { $cond: [{ $in: ["$status", ["active", "approved"]] }, 1, 0] } },
+          pending: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+          invited: { $sum: { $cond: [{ $eq: ["$status", "invited"] }, 1, 0] } },
+        },
+      },
+      { $match: { total: { $gt: 0 } } },
+      { $sort: { total: -1 } },
+    ]);
+
+    res.json({
+      success: true,
+      stats: counts,
+      cityDistribution,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Error fetching blood bank stats", error: error.message });
+  }
+});
+
+/* ======================================================
+   API 4: Admin — List Blood Banks with Backend Pagination
+   GET /api/blood-bank/all?status=all&page=1&limit=15&search=...
    Auth: admin
 ====================================================== */
 router.get("/all", verifyToken, async (req, res) => {
   try {
-    const { status, city } = req.query;
+    const { status, city, search } = req.query;
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 15;
+    const skip = (page - 1) * limit;
+
     const filter = {};
 
     if (status && status !== "all") {
@@ -395,11 +473,42 @@ router.get("/all", verifyToken, async (req, res) => {
       filter.city = new RegExp(city.trim(), "i");
     }
 
+    if (search && search.trim()) {
+      const regex = new RegExp(search.trim(), "i");
+      filter.$or = [
+        { name: regex },
+        { managerName: regex },
+        { email: regex },
+        { mobile: regex },
+        { licenseNumber: regex },
+        { city: regex },
+        { state: regex },
+        { address: regex },
+      ];
+    }
+
+    const total = await BloodBank.countDocuments(filter);
+    const totalPages = Math.ceil(total / limit) || 1;
+
     const bloodBanks = await BloodBank.find(filter)
       .select("-password -passwordToken -passwordTokenExpiresAt")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    res.json({ success: true, data: bloodBanks });
+    res.json({
+      success: true,
+      count: bloodBanks.length,
+      data: bloodBanks,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error listing blood banks", error: error.message });
   }
