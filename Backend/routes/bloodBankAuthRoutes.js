@@ -45,7 +45,7 @@ const upload = multer({
   },
 });
 
-// IP-based Login Rate Limiter (Max 5 attempts per 15 min per IP)
+// IP-based Login Rate Limiter (Max 14 attempts per 15 min per IP)
 const loginAttempts = new Map();
 function rateLimitLogin(req, res, next) {
   const ip = req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress;
@@ -58,7 +58,7 @@ function rateLimitLogin(req, res, next) {
 
   const attempts = loginAttempts.get(ip).filter((timestamp) => now - timestamp < windowMs);
 
-  if (attempts.length >= 5) {
+  if (attempts.length >= 14) {
     return res.status(429).json({
       success: false,
       message: "Too many login attempts. Please try again after 15 minutes.",
