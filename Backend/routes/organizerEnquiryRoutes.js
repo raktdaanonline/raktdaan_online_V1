@@ -27,7 +27,7 @@ router.post("/submit", async (req, res) => {
       await transporter.sendMail({
         from: process.env.SMTP_USER || process.env.EMAIL_USER,
         to: email,
-        subject: "Raktdaan - Aapki Camp Request Mili! ✅",
+        subject: "Raktdaan - We have received your camp request. ✅",
         html: emailTemplates.enquiryConfirmation(organizerName, enquiry)
       });
       // Optionally notify admin via email

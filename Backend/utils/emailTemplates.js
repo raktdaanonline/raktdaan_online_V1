@@ -1,11 +1,11 @@
 export const emailTemplates = {
   enquiryConfirmation: (organizerName, campDetails) => `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
-      <h2 style="color: #E11D48;">Raktdaan - Aapki Camp Request Mili! ✅</h2>
+      <h2 style="color: #E11D48;">Raktdaan - Camp Request Received! ✅</h2>
       <p>Hello ${organizerName},</p>
       <p>Thank you for initiating a blood donation camp with Raktdaan.</p>
       <p>We have received your request for a camp at <strong>${campDetails.area}</strong> on <strong>${new Date(campDetails.preferredDate).toDateString()}</strong>.</p>
-      <p>Hamare admin 24-48 ghante mein aapki request review karenge aur aapse sampark karenge.</p>
+      <p>Our team will review your request within 24-48 hours and contact you shortly.</p>
       <br/>
       <p>For any queries, contact us at: support@raktdaan.com</p>
       <p>Regards,<br/>Raktdaan Team</p>
@@ -30,7 +30,7 @@ export const emailTemplates = {
   approvalEmail: (organizerName, campDetails, email, tempPassword) => `
     <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #111; color: #eee; border-radius: 8px;">
       <h2 style="color: #E11D48;">🎉 Camp Approved - Login Credentials</h2>
-      <p>Congratulations ${organizerName}, Aapka camp approve ho gaya hai!</p>
+      <p>Congratulations ${organizerName}, Your camp is approved!</p>
       
       <div style="background-color: #222; padding: 15px; border-radius: 5px; margin: 20px 0;">
         <h3 style="margin-top: 0;">Camp Details</h3>
@@ -61,7 +61,7 @@ export const emailTemplates = {
       <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #E11D48; margin: 20px 0;">
         <p><strong>Reason:</strong> ${reason}</p>
       </div>
-      <p>Aap future mein dobara request kar sakte hain ya kisi existing camp mein jud sakte hain.</p>
+      <p>You can request again in the future or join an existing camp.</p>
       <p>Regards,<br/>Raktdaan Team</p>
     </div>
   `,
@@ -85,10 +85,10 @@ export const emailTemplates = {
         <p style="font-size: 18px; margin: 10px 0; color: #E11D48;">❤️ <strong>${stats.livesSaved}</strong> Lives Saved</p>
       </div>
       
-      <p style="text-align: center; font-size: 18px; font-style: italic;">"Aapke is ek kadam se ${stats.livesSaved} logon ki zindagi mein farq pada."</p>
+      <p style="text-align: center; font-size: 18px; font-style: italic;">"Your one step has made a difference in the lives of ${stats.livesSaved} people."</p>
       
       <div style="text-align: center; margin-top: 30px;">
-        <p>Thank you ${organizerName} ji - Agle saal bhi? 🎂</p>
+        <p>Thank you ${organizerName} - Same time next year? 🎂</p>
       </div>
     </div>
   `,

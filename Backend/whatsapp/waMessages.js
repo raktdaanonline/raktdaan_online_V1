@@ -40,9 +40,9 @@ _Raktdaan Team_`.trim(),
   enquiryApproved: (organizerName, email, tempPassword, campDate, venue) =>
 `${E.party} *Raktdaan — Camp Approved!*
 
-Namaste ${organizerName} ji!
+Hello ${organizerName} !
 
-Aapki camp request *approve* ho gayi hai!
+Your camp request has been approved!
 
 ${E.tent} *Camp Details:*
 ${E.cal} Date: ${campDate}
@@ -54,20 +54,20 @@ Password: *${tempPassword}*
 
 ${E.phone} Login: raktdaan.online/organizer-login
 
-${E.warn} _Password zaroor change karein._
+${E.warn} _Password must be changed._
 
 _Raktdaan Team_`.trim(),
 
   enquiryRejected: (organizerName, reason) =>
 `*Raktdaan — Camp Request Update*
 
-Namaste ${organizerName} ji,
+Hello ${organizerName} !
 
-Aapki camp request approve nahi ho payi.
+Your camp request has been rejected.
 
 Reason: ${reason}
 
-Aap dobara request kar sakte hain.
+You can request again.
 
 _Raktdaan Team_`.trim(),
 
@@ -81,10 +81,10 @@ ${E.cal} *Date:* ${campDate}
 ${E.pin} *Venue:* ${venue}
 ${E.alarm} *Your slot:* ${timeSlot}
 
-*Yaad rakhein:*
-- Khali pet mat aaiye
-- Paani pee ke aaiye
-- ID proof saath laiye
+*Remember:*
+- Do not come on an empty stomach.
+- Drink some water before coming.
+- Bring proof of ID.
 
 Reply *YES* to confirm
 Reply *NO* to cancel
@@ -92,59 +92,58 @@ Reply *NO* to cancel
 ${E.blood} _Raktdaan_`.trim(),
 
   campReminder: (donorName, campTitle, campDate, venue) =>
-`${E.alarm} *Kal camp hai!*
+`${E.alarm} *Camp tomorrow!*
 
-Namaste ${donorName} ji!
+Hello ${donorName} ji!
 
-Kal *${campTitle}* hai!
+*${campTitle}* is tomorrow!
 
 ${E.cal} Date: ${campDate}
 ${E.pin} Venue: ${venue}
 
-Reply *YES* — Main aa raha/rahi hoon
-Reply *NO* — Main nahi aa sakta
+Reply *YES* — I am coming
+Reply *NO* — I can't come
 
 _Raktdaan_`.trim(),
 
   campComplete: (organizerName, campTitle, donors, units, livesSaved) =>
-`${E.party} *Camp Successful Raha!*
+`${E.party} *The camp was a success!*
 
-Namaste ${organizerName} ji!
+Hello ${organizerName} ji!
 
-*${campTitle}* bahut achha raha!
+*${campTitle}* went very well!
 
-${E.users} Donors aaye: *${donors}*
+${E.users} Donors came: *${donors}*
 ${E.blood} Units collected: *${units}*
 ${E.heart} Lives saved: *${livesSaved}*
 
-Certificate dashboard mein available hai.
+Certificate is available on dashboard.
 raktdaan.online/organizer-dashboard
 
-Aapka shukriya! ${E.trophy}
+Thank you! ${E.trophy}
 _Raktdaan Team_`.trim(),
 
   donorCertificate: (donorName, campTitle, campDate, badge) =>
 `${E.medal} *Blood Donation Certificate*
 
-Namaste ${donorName} ji!
+Hello ${donorName} ji!
 
-*${campTitle}* mein donate karne ke liye shukriya!
-
+*${campTitle}* Thank you for donating to Bloods!
 ${E.trophy} Badge: *${badge}*
 
-3 mahine baad phir eligible honge.
+You will be eligible again after 3 months.
 _Raktdaan_`.trim(),
 
   urgentBlood: (bloodGroup, hospital, city, units) =>
 `${E.siren} *URGENT — Blood Required!*
 
-*${bloodGroup} blood* chahiye abhi!
+*${bloodGroup} blood* Need  right now.!
 
 Hospital: ${hospital}
 City: ${city}
 Units needed: ${units}
 
-Donate kar sakte ho toh reply *DONATE*
+If you can donate, reply with *DONATE*
 
 _Raktdaan Emergency_`.trim(),
 

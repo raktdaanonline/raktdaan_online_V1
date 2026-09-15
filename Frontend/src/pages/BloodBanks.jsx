@@ -147,8 +147,11 @@ export default function BloodBanks() {
         }
       }
 
-      // Filter out banks whose calculated driving distance exceeds the selected radius
-      fetchedBanks = fetchedBanks.filter(bank => Number(bank.distanceKm) <= radius);
+      // Filter out banks whose calculated driving distance exceeds the selected radius ONLY if no search query is active
+      const hasSearch = Boolean((sq && sq.trim()) || (searchQuery && searchQuery.trim()));
+      if (!hasSearch) {
+        fetchedBanks = fetchedBanks.filter(bank => Number(bank.distanceKm) <= Number(r || radius));
+      }
 
       setBloodBanks(fetchedBanks);
     } catch (err) {
@@ -262,6 +265,9 @@ export default function BloodBanks() {
               <option value={20}>20 km Radius</option>
               <option value={30}>30 km Radius</option>
               <option value={50}>50 km Radius</option>
+              <option value={100}>100 km Radius</option>
+              <option value={200}>200 km Radius</option>
+              <option value={500}>500 km Radius</option>
             </select>
           </div>
 
@@ -465,17 +471,21 @@ export default function BloodBanks() {
               )}
 
               {/* Blood Bank Markers */}
-              {bloodBanks.map((bank) => (
-                <Marker
-                  key={bank._id}
-                  position={[bank.location.coordinates[1], bank.location.coordinates[0]]}
-                  icon={redIcon}
-                  eventHandlers={{
-                    click: () => {
-                      setSelectedBank(bank);
-                    },
-                  }}
-                >
+              {bloodBanks.map((bank) => {
+                if (!bank.location?.coordinates || (bank.location.coordinates[0] === 0 && bank.location.coordinates[1] === 0)) {
+                  return null;
+                }
+                return (
+                  <Marker
+                    key={bank._id}
+                    position={[bank.location.coordinates[1], bank.location.coordinates[0]]}
+                    icon={redIcon}
+                    eventHandlers={{
+                      click: () => {
+                        setSelectedBank(bank);
+                      },
+                    }}
+                  >
                   <Popup>
                     <div className="map-info-window">
                       <h4 className="info-title">{bank.name}</h4>
@@ -495,7 +505,8 @@ export default function BloodBanks() {
                     </div>
                   </Popup>
                 </Marker>
-              ))}
+              );
+            })}
             </MapContainer>
           </div>
         </div>

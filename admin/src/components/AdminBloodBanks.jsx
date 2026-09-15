@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key } from "lucide-react";
+import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key, ChevronDown, Edit3, Trash2, Save, CheckCircle2, Navigation } from "lucide-react";
 import adminService from "../services/adminService";
 import AdminInviteBloodBank from "./AdminInviteBloodBank";
 
@@ -19,9 +19,45 @@ export default function AdminBloodBanks() {
   const [copiedId, setCopiedId] = useState(null);
   const [copiedPassId, setCopiedPassId] = useState(null);
 
+  const [selectedCity, setSelectedCity] = useState("all");
+  const [citiesList, setCitiesList] = useState([]);
+
+  // Edit Blood Bank Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBank, setEditingBank] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    managerName: "",
+    email: "",
+    mobile: "",
+    licenseNumber: "",
+    licenseExpiryDate: "",
+    city: "",
+    state: "",
+    address: "",
+    pincode: "",
+    emergencyContact: "",
+    is24x7: false,
+    openTime: "09:00",
+    closeTime: "20:00",
+    latitude: "",
+    longitude: "",
+    status: "active",
+    isVerified: true,
+  });
+
   useEffect(() => {
     fetchBloodBanks();
   }, [activeTab]);
+
+  useEffect(() => {
+    adminService.getCities().then((res) => {
+      if (res.success && res.data) {
+        setCitiesList(res.data);
+      }
+    }).catch((err) => console.warn("Failed loading cities list in blood banks:", err));
+  }, []);
 
   const copyToClipboard = async (text) => {
     if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -91,6 +127,99 @@ export default function AdminBloodBanks() {
       toast.error("Failed to fetch blood banks");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOpenEditModal = (bank) => {
+    setEditingBank(bank);
+    setEditForm({
+      name: bank.name || "",
+      managerName: bank.managerName || "",
+      email: bank.email || "",
+      mobile: bank.mobile || "",
+      licenseNumber: bank.licenseNumber || "",
+      licenseExpiryDate: bank.licenseExpiryDate ? bank.licenseExpiryDate.split("T")[0] : "",
+      city: bank.city || "",
+      state: bank.state || "Maharashtra",
+      address: bank.address || "",
+      pincode: bank.pincode || "",
+      emergencyContact: bank.emergencyContact || "",
+      is24x7: bank.is24x7 || bank.available24x7 || false,
+      openTime: bank.openTime || bank.openingTime || "09:00",
+      closeTime: bank.closeTime || bank.closingTime || "20:00",
+      latitude: bank.latitude !== undefined && bank.latitude !== null ? bank.latitude : (bank.location?.coordinates?.[1] || ""),
+      longitude: bank.longitude !== undefined && bank.longitude !== null ? bank.longitude : (bank.location?.coordinates?.[0] || ""),
+      status: bank.status || "active",
+      isVerified: bank.isVerified ?? true,
+    });
+    setShowEditModal(true);
+  };
+
+  const handleAutoGeocode = () => {
+    const c = (editForm.city || "").toLowerCase().trim();
+    if (c.includes("mumbai")) {
+      setEditForm(prev => ({ ...prev, latitude: 19.0760, longitude: 72.8777, state: prev.state || "Maharashtra" }));
+      toast.success("Set coordinates to Mumbai (19.0760, 72.8777)");
+    } else if (c.includes("pune")) {
+      setEditForm(prev => ({ ...prev, latitude: 18.5204, longitude: 73.8567, state: prev.state || "Maharashtra" }));
+      toast.success("Set coordinates to Pune (18.5204, 73.8567)");
+    } else if (c.includes("hyderabad")) {
+      setEditForm(prev => ({ ...prev, latitude: 17.3850, longitude: 78.4867, state: prev.state || "Telangana" }));
+      toast.success("Set coordinates to Hyderabad (17.3850, 78.4867)");
+    } else if (c.includes("bengaluru") || c.includes("bangalore")) {
+      setEditForm(prev => ({ ...prev, latitude: 12.9716, longitude: 77.5946, state: prev.state || "Karnataka" }));
+      toast.success("Set coordinates to Bengaluru (12.9716, 77.5946)");
+    } else if (c.includes("karnataka") || c.includes("athani") || c.includes("bagalkot")) {
+      setEditForm(prev => ({ ...prev, latitude: 16.7333, longitude: 75.0560, state: prev.state || "Karnataka" }));
+      toast.success("Set coordinates to Karnataka (16.7333, 75.0560)");
+    } else {
+      toast.info("Please enter custom latitude & longitude for this city");
+    }
+  };
+
+  const handleSaveEdit = async (e) => {
+    e.preventDefault();
+    if (!editForm.name || !editForm.email || !editForm.mobile || !editForm.licenseNumber || !editForm.city) {
+      toast.error("Please fill in all required fields (Name, Email, Mobile, License, City)");
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const res = await adminService.updateBloodBank(editingBank._id, editForm);
+      if (res.success) {
+        toast.success(res.message || "Blood bank updated successfully!");
+        setShowEditModal(false);
+        setEditingBank(null);
+        if (selectedBank?._id === editingBank._id) {
+          setSelectedBank(res.data);
+        }
+        fetchBloodBanks();
+      } else {
+        toast.error(res.message || "Failed to update blood bank");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error updating blood bank");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleDelete = async (id, name) => {
+    if (!window.confirm(`Are you sure you want to permanently delete blood bank "${name}"? This cannot be undone.`)) return;
+    setActionLoading(true);
+    try {
+      const res = await adminService.deleteBloodBank(id);
+      if (res.success) {
+        toast.success(res.message || "Blood bank deleted successfully.");
+        if (selectedBank?._id === id) setSelectedBank(null);
+        if (editingBank?._id === id) setShowEditModal(false);
+        fetchBloodBanks();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error deleting blood bank");
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -223,11 +352,17 @@ export default function AdminBloodBanks() {
     return new Date(date) < new Date();
   };
 
-  const filteredBanks = bloodBanks.filter((bank) =>
-    bank.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    bank.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    bank.licenseNumber.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredBanks = bloodBanks.filter((bank) => {
+    const name = (bank.name || "").toLowerCase();
+    const city = (bank.city || "").toLowerCase();
+    const license = (bank.licenseNumber || "").toLowerCase();
+    const query = searchQuery.toLowerCase().trim();
+
+    const matchesSearch = !query || name.includes(query) || city.includes(query) || license.includes(query);
+    const matchesCity = selectedCity === "all" || city === selectedCity.toLowerCase().trim();
+
+    return matchesSearch && matchesCity;
+  });
 
   return (
     <div className="bg-[#0f172a] p-6 rounded-xl border border-zinc-800 text-white min-h-[500px]">
@@ -249,8 +384,23 @@ export default function AdminBloodBanks() {
           >
             <Plus className="w-4 h-4" /> Invite Blood Bank
           </button>
+
+          {/* City Filter Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="pl-3 pr-8 py-2 bg-[#1e293b] border border-zinc-700 rounded-lg focus:outline-none focus:border-red-500 text-xs text-white appearance-none cursor-pointer"
+            >
+              <option value="all">All Cities</option>
+              {citiesList.map((c) => (
+                <option key={c._id} value={c.name}>{c.name}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2.5 top-2.5 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+          </div>
           
-          <div className="relative flex-1 md:w-64">
+          <div className="relative flex-1 md:w-56">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-zinc-500" />
             <input
               type="text"
@@ -346,65 +496,92 @@ export default function AdminBloodBanks() {
                         {bank.status}
                       </span>
                     </td>
-                    <td className="py-4 px-4 flex justify-start items-center gap-2">
-                      <button
-                        onClick={() => setSelectedBank(bank)}
-                        className="flex items-center gap-1 px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded text-xs font-bold transition-all border border-zinc-700 cursor-pointer"
-                      >
-                        <Eye className="w-3.5 h-3.5" /> View Details
-                      </button>
-
-                      {(bank.status === "approved" || bank.status === "active") && (
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-1.5">
+                        {/* View Details */}
                         <button
-                          disabled={actionLoading}
-                          onClick={() => handleCopyPasswordLink(bank._id)}
-                          className="flex items-center gap-1 px-3 py-1 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 hover:text-emerald-300 rounded text-xs font-bold transition-all border border-emerald-500/30 cursor-pointer"
-                          title="Copy Password Setup Link (Pass Link)"
+                          onClick={() => setSelectedBank(bank)}
+                          className="h-7 px-2.5 bg-zinc-800/90 hover:bg-zinc-700 text-zinc-300 hover:text-white rounded-md text-[11px] font-semibold flex items-center gap-1 border border-zinc-700 transition-all cursor-pointer shadow-sm"
+                          title="View Full Details"
                         >
-                          {copiedPassId === bank._id ? (
-                            <>
-                              <Check className="w-3.5 h-3.5 text-green-400" />
-                              <span className="text-green-400">Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Key className="w-3.5 h-3.5" />
-                              <span>Pass Link</span>
-                            </>
-                          )}
+                          <Eye className="w-3.5 h-3.5 text-zinc-400" />
+                          <span>View</span>
                         </button>
-                      )}
 
-                      {bank.status === "invited" && (
-                        <>
+                        {/* Edit */}
+                        <button
+                          onClick={() => handleOpenEditModal(bank)}
+                          className="h-7 w-7 flex items-center justify-center bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 rounded-md border border-blue-500/30 transition-all cursor-pointer shadow-sm"
+                          title="Edit Blood Bank Details"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Pass Link (Active/Approved) */}
+                        {(bank.status === "approved" || bank.status === "active") && (
                           <button
                             disabled={actionLoading}
-                            onClick={() => handleCopyInviteLink(bank._id)}
-                            className="flex items-center gap-1 px-3 py-1 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 hover:text-blue-300 rounded text-xs font-bold transition-all border border-blue-500/20 cursor-pointer"
-                            title="Copy Blood Bank Registration Link"
+                            onClick={() => handleCopyPasswordLink(bank._id)}
+                            className="h-7 px-2 bg-emerald-600/15 hover:bg-emerald-600/30 text-emerald-400 hover:text-emerald-300 rounded-md text-[11px] font-semibold flex items-center gap-1 border border-emerald-500/30 transition-all cursor-pointer shadow-sm"
+                            title="Copy Password Setup Link (Pass Link)"
                           >
-                            {copiedId === bank._id ? (
+                            {copiedPassId === bank._id ? (
                               <>
-                                <Check className="w-3.5 h-3.5 text-green-400" />
-                                <span className="text-green-400">Copied!</span>
+                                <Check className="w-3 h-3 text-green-400" />
+                                <span className="text-green-400">Copied</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="w-3.5 h-3.5" />
-                                <span>Copy Link</span>
+                                <Key className="w-3 h-3" />
+                                <span>Pass</span>
                               </>
                             )}
                           </button>
+                        )}
 
-                          <button
-                            disabled={actionLoading}
-                            onClick={() => handleResendInvite(bank._id)}
-                            className="flex items-center gap-1 px-3 py-1 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded text-xs font-bold transition-all border border-red-500/20 cursor-pointer"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" /> Resend Invite
-                          </button>
-                        </>
-                      )}
+                        {/* Invite Link & Resend (Invited) */}
+                        {bank.status === "invited" && (
+                          <>
+                            <button
+                              disabled={actionLoading}
+                              onClick={() => handleCopyInviteLink(bank._id)}
+                              className="h-7 px-2 bg-blue-600/15 hover:bg-blue-600/30 text-blue-400 hover:text-blue-300 rounded-md text-[11px] font-semibold flex items-center gap-1 border border-blue-500/30 transition-all cursor-pointer shadow-sm"
+                              title="Copy Registration Invite Link"
+                            >
+                              {copiedId === bank._id ? (
+                                <>
+                                  <Check className="w-3 h-3 text-green-400" />
+                                  <span className="text-green-400">Copied</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Link</span>
+                                </>
+                              )}
+                            </button>
+
+                            <button
+                              disabled={actionLoading}
+                              onClick={() => handleResendInvite(bank._id)}
+                              className="h-7 w-7 flex items-center justify-center bg-amber-600/15 hover:bg-amber-600/30 text-amber-400 hover:text-amber-300 rounded-md border border-amber-500/30 transition-all cursor-pointer shadow-sm"
+                              title="Resend Invite Email"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+
+                        {/* Delete */}
+                        <button
+                          disabled={actionLoading}
+                          onClick={() => handleDelete(bank._id, bank.name)}
+                          className="h-7 w-7 flex items-center justify-center bg-red-600/15 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded-md border border-red-500/30 transition-all cursor-pointer shadow-sm"
+                          title="Permanently Delete Blood Bank"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -439,6 +616,350 @@ export default function AdminBloodBanks() {
         </div>
       )}
 
+      {/* Edit Blood Bank Modal */}
+      {showEditModal && editingBank && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-[#0f172a] rounded-2xl border border-zinc-700 shadow-2xl w-full max-w-4xl p-6 sm:p-8 relative my-8 text-white max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-zinc-800 pb-4 mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="p-2 bg-blue-600/20 text-blue-400 rounded-lg border border-blue-500/30">
+                    <Edit3 className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h3 className="text-xl font-black text-white">Edit Blood Bank Details</h3>
+                    <p className="text-xs text-zinc-400">Update all fields, contact info, coordinates, and operational status</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowEditModal(false); setEditingBank(null); }}
+                className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Form Scrollable Body */}
+            <form onSubmit={handleSaveEdit} className="flex-1 overflow-y-auto pr-2 space-y-6 custom-scrollbar">
+              
+              {/* Section 1: Basic Information */}
+              <div>
+                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
+                  <Building className="w-4 h-4" /> 1. Basic & Management Information
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Blood Bank Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="e.g. Sassoon General Hospital Blood Bank"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Manager / Authorized Person Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.managerName}
+                      onChange={(e) => setEditForm({ ...editForm, managerName: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="e.g. Dr. Rajesh Sharma"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      value={editForm.email}
+                      onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="e.g. bloodbank@hospital.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Primary Mobile Number *</label>
+                    <input
+                      type="tel"
+                      required
+                      value={editForm.mobile}
+                      onChange={(e) => setEditForm({ ...editForm, mobile: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="10 digit mobile number"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Emergency Contact Number</label>
+                    <input
+                      type="tel"
+                      value={editForm.emergencyContact}
+                      onChange={(e) => setEditForm({ ...editForm, emergencyContact: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="24x7 emergency helpline"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: License & Legal */}
+              <div>
+                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
+                  <FileText className="w-4 h-4" /> 2. License & Legal Details
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Drug License Number *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editForm.licenseNumber}
+                      onChange={(e) => setEditForm({ ...editForm, licenseNumber: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="e.g. MH-PUN-12345"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">License Expiry Date</label>
+                    <input
+                      type="date"
+                      value={editForm.licenseExpiryDate}
+                      onChange={(e) => setEditForm({ ...editForm, licenseExpiryDate: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Location & Coordinates */}
+              <div>
+                <div className="flex justify-between items-center mb-3 border-b border-zinc-800 pb-1.5">
+                  <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4" /> 3. Location, Address & GPS Coordinates
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleAutoGeocode}
+                    className="px-2.5 py-1 bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 rounded text-[11px] font-bold border border-amber-500/30 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <Navigation className="w-3 h-3" /> Auto-fill GPS from City
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">City *</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        required
+                        list="city-options"
+                        value={editForm.city}
+                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                        className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                        placeholder="e.g. Pune, Mumbai"
+                      />
+                      <datalist id="city-options">
+                        {citiesList.map(c => (
+                          <option key={c._id} value={c.name} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">State</label>
+                    <input
+                      type="text"
+                      value={editForm.state}
+                      onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="e.g. Maharashtra"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Pincode</label>
+                    <input
+                      type="text"
+                      value={editForm.pincode}
+                      onChange={(e) => setEditForm({ ...editForm, pincode: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="6-digit pincode"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-bold text-zinc-400 mb-1">Full Street Address</label>
+                  <textarea
+                    rows="2"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500 leading-relaxed"
+                    placeholder="Complete hospital address with landmark..."
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-900/40 p-3 rounded-lg border border-zinc-800">
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-400 mb-1">GPS Latitude (e.g. 18.5204)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.latitude}
+                      onChange={(e) => setEditForm({ ...editForm, latitude: e.target.value })}
+                      className="w-full p-2 bg-[#1e293b] border border-zinc-700 rounded text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="Latitude"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-zinc-400 mb-1">GPS Longitude (e.g. 73.8567)</label>
+                    <input
+                      type="number"
+                      step="any"
+                      value={editForm.longitude}
+                      onChange={(e) => setEditForm({ ...editForm, longitude: e.target.value })}
+                      className="w-full p-2 bg-[#1e293b] border border-zinc-700 rounded text-xs text-white focus:outline-none focus:border-red-500"
+                      placeholder="Longitude"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 4: Operational Timing */}
+              <div>
+                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
+                  <Clock className="w-4 h-4" /> 4. Operational Timing & Schedule
+                </h4>
+                
+                <div className="flex items-center gap-3 mb-3">
+                  <input
+                    type="checkbox"
+                    id="edit-is24x7"
+                    checked={editForm.is24x7}
+                    onChange={(e) => setEditForm({ ...editForm, is24x7: e.target.checked })}
+                    className="w-4 h-4 text-red-600 rounded bg-zinc-900 border-zinc-700 focus:ring-red-500 cursor-pointer"
+                  />
+                  <label htmlFor="edit-is24x7" className="text-xs font-bold text-zinc-200 cursor-pointer">
+                    Available 24x7 (Open Round the Clock)
+                  </label>
+                </div>
+
+                {!editForm.is24x7 && (
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 mb-1">Opening Time</label>
+                      <input
+                        type="time"
+                        value={editForm.openTime}
+                        onChange={(e) => setEditForm({ ...editForm, openTime: e.target.value })}
+                        className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-400 mb-1">Closing Time</label>
+                      <input
+                        type="time"
+                        value={editForm.closeTime}
+                        onChange={(e) => setEditForm({ ...editForm, closeTime: e.target.value })}
+                        className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 5: Status & Verification */}
+              <div>
+                <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-3 flex items-center gap-1.5 border-b border-zinc-800 pb-1.5">
+                  <ShieldCheck className="w-4 h-4" /> 5. Account Status & Verification
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-zinc-400 mb-1">Status State</label>
+                    <select
+                      value={editForm.status}
+                      onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                      className="w-full p-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg text-xs text-white focus:outline-none focus:border-red-500 cursor-pointer"
+                    >
+                      <option value="active">🟢 Active</option>
+                      <option value="approved">✅ Approved</option>
+                      <option value="pending">⏳ Pending Review</option>
+                      <option value="invited">✉️ Invited</option>
+                      <option value="suspended">⚠️ Suspended</option>
+                      <option value="rejected">❌ Rejected</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-6">
+                    <input
+                      type="checkbox"
+                      id="edit-isVerified"
+                      checked={editForm.isVerified}
+                      onChange={(e) => setEditForm({ ...editForm, isVerified: e.target.checked })}
+                      className="w-4 h-4 text-green-600 rounded bg-zinc-900 border-zinc-700 focus:ring-green-500 cursor-pointer"
+                    />
+                    <label htmlFor="edit-isVerified" className="text-xs font-bold text-zinc-200 cursor-pointer flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> Account Verified (Public Visibility Enabled)
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-4 border-t border-zinc-800 flex flex-col sm:flex-row justify-between items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleDelete(editingBank._id, editingBank.name)}
+                  className="px-4 py-2.5 bg-red-950/40 hover:bg-red-900/60 text-red-400 rounded-lg text-xs font-bold border border-red-800/40 transition-colors flex items-center gap-1.5 cursor-pointer w-full sm:w-auto justify-center"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete Blood Bank
+                </button>
+
+                <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowEditModal(false); setEditingBank(null); }}
+                    className="px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={editLoading}
+                    className="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-all shadow-lg shadow-red-600/30 flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {editLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" /> Saving Changes...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" /> Save All Changes
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Drawer slide-out */}
       {selectedBank && (
         <>
@@ -466,6 +987,24 @@ export default function AdminBloodBanks() {
             {/* Content body */}
             <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar text-sm">
               
+              {/* Quick Actions in Drawer */}
+              <div className="pt-1 flex gap-2">
+                <button
+                  onClick={() => handleOpenEditModal(selectedBank)}
+                  className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-blue-600/20"
+                >
+                  <Edit3 className="w-4 h-4" /> Edit Details
+                </button>
+                <button
+                  disabled={actionLoading}
+                  onClick={() => handleDelete(selectedBank._id, selectedBank.name)}
+                  className="px-4 py-2.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300 rounded-lg font-bold text-xs transition-colors flex items-center justify-center gap-1.5 border border-red-500/30 cursor-pointer"
+                  title="Delete Blood Bank"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete
+                </button>
+              </div>
+
               {/* Contact info */}
               <div className="space-y-3">
                 <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider border-b border-zinc-800 pb-1">Operational Info</h4>

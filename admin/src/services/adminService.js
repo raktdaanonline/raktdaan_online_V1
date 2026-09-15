@@ -128,6 +128,50 @@ const adminService = {
     const res = await api.put(`/blood-bank/${id}/status`, { status, note });
     return res.data;
   },
+  updateBloodBank: async (id, updateData) => {
+    const res = await api.put(`/blood-bank/${id}`, updateData);
+    return res.data;
+  },
+  deleteBloodBank: async (id) => {
+    const res = await api.delete(`/blood-bank/${id}`);
+    return res.data;
+  },
+
+  // City Management
+  getCities: async () => {
+    const res = await api.get("/cities");
+    return res.data;
+  },
+  getAllCitiesAdmin: async (params) => {
+    const res = await api.get("/cities/admin/all", { params });
+    return res.data;
+  },
+  createCity: async (cityData) => {
+    const res = await api.post("/cities", cityData);
+    return res.data;
+  },
+  updateCity: async (id, cityData) => {
+    const res = await api.put(`/cities/${id}`, cityData);
+    return res.data;
+  },
+  toggleCityStatus: async (id) => {
+    const res = await api.patch(`/cities/${id}/toggle-status`);
+    return res.data;
+  },
+  deleteCity: async (id) => {
+    const res = await api.delete(`/cities/${id}`);
+    return res.data;
+  },
+  clearAllCities: async () => {
+    const res = await api.delete("/cities/admin/clear-all");
+    return res.data;
+  },
+  uploadCityImage: async (formData) => {
+    const res = await api.post("/cities/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+    return res.data;
+  },
 };
 
 export default adminService;

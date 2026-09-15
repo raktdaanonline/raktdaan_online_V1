@@ -12,8 +12,19 @@ api.interceptors.request.use(
     const jwtToken = localStorage.getItem("jwt_token");
     const bloodBankToken = localStorage.getItem("bloodBankToken");
 
-    // Attach admin-token for admin, camps, or donors routes if available
-    if (adminToken && (config.url.includes("/admin") || config.url.includes("/camps") || config.url.includes("/donors") || config.url.includes("/organizer-enquiry") || config.url.includes("/blood-bank"))) {
+    // Attach admin-token for admin, cities, camps, or donors routes if available
+    if (adminToken && (
+      config.url.includes("/admin") ||
+      config.url.includes("/cities") ||
+      config.url.includes("/camps") ||
+      config.url.includes("/donors") ||
+      config.url.includes("/organizer-enquiry") ||
+      config.url.includes("/blood-bank") ||
+      config.url.includes("/impact-gallery") ||
+      config.url.includes("/news") ||
+      config.url.includes("/success-stories") ||
+      config.url.includes("/blood-request-background")
+    )) {
       config.headers.Authorization = `Bearer ${adminToken}`;
     } 
     // Attach organizer-token for organizer or WhatsApp routes if available

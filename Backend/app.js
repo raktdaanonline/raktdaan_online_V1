@@ -34,6 +34,7 @@ import healthRoutes from "./routes/healthRoutes.js";
 import bloodUnitRoutes from "./routes/bloodUnitRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import requestFlowRoutes from "./routes/requestFlowRoutes.js";
+import cityRoutes from "./routes/cityRoutes.js";
 import expiryChecker from "./cron/expiryChecker.js";
 import licenseChecker from "./cron/licenseChecker.js";
 
@@ -174,6 +175,7 @@ app.use("/api/location", locationRoutes);
 app.use("/api/blood-units", bloodUnitRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/request-flow", requestFlowRoutes);
+app.use("/api/cities", cityRoutes);
 
 // SERVE FRONTEND IN PRODUCTION (Hostinger Ready)
 const frontendPath = path.join(__dirname, "../Frontend/dist");

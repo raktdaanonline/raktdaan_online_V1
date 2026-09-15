@@ -8,6 +8,7 @@ import BloodRequestBackgroundAdmin from "../components/BloodRequestBackgroundAdm
 import AdminBloodBanks from "../components/AdminBloodBanks.jsx";
 import AdminBloodBankRequests from "../components/AdminBloodBankRequests.jsx";
 import HomeContentAdmin from "../components/HomeContentAdmin.jsx";
+import CityManagementAdmin from "../components/CityManagementAdmin.jsx";
 import adminService from "../services/adminService";
 import campService from "../services/campService";
 import donorService from "../services/donorService";
@@ -1583,6 +1584,13 @@ const Admin = () => {
           >
             <span className="menu-item-icon">🤝</span> <span className="menu-item-text">Organizers</span>
           </button>
+          <button
+            className={`menu-item ${currentView === "cities" ? "active" : ""}`}
+            onClick={() => setCurrentView("cities")}
+            title="City Management"
+          >
+            <span className="menu-item-icon">🏙️</span> <span className="menu-item-text">City Management</span>
+          </button>
         </div>
 
         <div className="menu-section">
@@ -2913,6 +2921,13 @@ const Admin = () => {
         {currentView === "blood-request-background" && (
           <div className="dashboard-details-grid pt-4">
             <BloodRequestBackgroundAdmin />
+          </div>
+        )}
+
+        {/* --- City Management Tab View --- */}
+        {currentView === "cities" && (
+          <div className="dashboard-details-grid pt-4">
+            <CityManagementAdmin />
           </div>
         )}
 

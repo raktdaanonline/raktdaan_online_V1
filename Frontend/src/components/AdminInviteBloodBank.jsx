@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { Mail, Phone, User, Building, MapPin, Shield, Send, Copy, Check } from "lucide-react";
+import { Mail, Phone, User, Building, MapPin, Shield, Send, Copy, Check, ChevronDown, Edit3 } from "lucide-react";
 import adminService from "../services/adminService";
 
 export default function AdminInviteBloodBank() {
@@ -15,9 +15,43 @@ export default function AdminInviteBloodBank() {
   const [loading, setLoading] = useState(false);
   const [createdInviteLink, setCreatedInviteLink] = useState("");
   const [isCopied, setIsCopied] = useState(false);
+  
+  // Cities list from City Management
+  const [cities, setCities] = useState([]);
+  const [loadingCities, setLoadingCities] = useState(false);
+  const [isCustomCity, setIsCustomCity] = useState(false);
+
+  useEffect(() => {
+    fetchActiveCities();
+  }, []);
+
+  const fetchActiveCities = async () => {
+    setLoadingCities(true);
+    try {
+      const res = await adminService.getCities();
+      if (res.success && res.data) {
+        setCities(res.data);
+      }
+    } catch (err) {
+      console.warn("Error fetching cities for invite:", err);
+    } finally {
+      setLoadingCities(false);
+    }
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleCitySelectChange = (e) => {
+    const val = e.target.value;
+    if (val === "__custom__") {
+      setIsCustomCity(true);
+      setFormData({ ...formData, city: "" });
+    } else {
+      setIsCustomCity(false);
+      setFormData({ ...formData, city: val });
+    }
   };
 
   const copyToClipboard = async (text) => {
@@ -41,6 +75,11 @@ export default function AdminInviteBloodBank() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.city.trim()) {
+      toast.error("Please select or enter a city.");
+      return;
+    }
+
     setLoading(true);
     setCreatedInviteLink("");
     try {
@@ -58,6 +97,7 @@ export default function AdminInviteBloodBank() {
           city: "",
           licenseNumber: "",
         });
+        setIsCustomCity(false);
       } else {
         toast.error(res.message || "Failed to send invitation.");
       }
@@ -176,20 +216,60 @@ export default function AdminInviteBloodBank() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* City */}
+          {/* City Selection / Dropdown */}
           <div>
-            <label className="block text-sm text-zinc-400 mb-2">City *</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm text-zinc-400">City *</label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomCity(!isCustomCity);
+                  setFormData({ ...formData, city: "" });
+                }}
+                className="text-[11px] text-red-400 hover:text-red-300 font-semibold cursor-pointer"
+              >
+                {isCustomCity ? "← Choose from list" : "+ Type other city"}
+              </button>
+            </div>
+
             <div className="relative">
-              <MapPin className="absolute left-3 top-3 w-5 h-5 text-zinc-500" />
-              <input
-                required
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                placeholder="e.g. New Delhi"
-                className="w-full pl-10 pr-4 py-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg focus:outline-none focus:border-red-500 text-white"
-              />
+              <MapPin className="absolute left-3 top-3 w-5 h-5 text-zinc-500 z-10 pointer-events-none" />
+              
+              {!isCustomCity ? (
+                <div className="relative">
+                  <select
+                    required
+                    name="city"
+                    value={formData.city}
+                    onChange={handleCitySelectChange}
+                    className="w-full pl-10 pr-8 py-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg focus:outline-none focus:border-red-500 text-white appearance-none cursor-pointer"
+                  >
+                    <option value="" className="bg-[#1e293b] text-zinc-400">
+                      {loadingCities ? "Loading cities..." : "-- Select City --"}
+                    </option>
+                    {cities.map((c) => (
+                      <option key={c._id} value={c.name} className="bg-[#1e293b] text-white">
+                        {c.name} {c.state ? `(${c.state})` : ""}
+                      </option>
+                    ))}
+                    <option value="__custom__" className="bg-[#1e293b] text-red-400 font-bold">
+                      + Type other custom city...
+                    </option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-3.5 w-4 h-4 text-zinc-500 pointer-events-none" />
+                </div>
+              ) : (
+                <input
+                  required
+                  type="text"
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  placeholder="Type city name (e.g. Mumbai, Pune)..."
+                  className="w-full pl-10 pr-4 py-2.5 bg-[#1e293b] border border-zinc-700 rounded-lg focus:outline-none focus:border-red-500 text-white"
+                  autoFocus
+                />
+              )}
             </div>
           </div>
 
@@ -215,7 +295,7 @@ export default function AdminInviteBloodBank() {
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg shadow-red-600/20 disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition-colors shadow-lg shadow-red-600/20 disabled:opacity-50 cursor-pointer"
           >
             {loading ? "Sending..." : (
               <>

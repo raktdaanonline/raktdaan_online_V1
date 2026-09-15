@@ -275,6 +275,9 @@ router.post("/register", upload.single("licenseDocument"), async (req, res) => {
     }
 
     // Update BloodBank doc
+    if (req.body.city && req.body.city.trim()) {
+      bloodBank.city = req.body.city.trim();
+    }
     bloodBank.address = address;
     bloodBank.state = state;
     bloodBank.pincode = pincode;
@@ -381,11 +384,15 @@ router.get("/verify-password-token", async (req, res) => {
 ====================================================== */
 router.get("/all", verifyToken, async (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, city } = req.query;
     const filter = {};
 
     if (status && status !== "all") {
       filter.status = status;
+    }
+
+    if (city && city !== "all") {
+      filter.city = new RegExp(city.trim(), "i");
     }
 
     const bloodBanks = await BloodBank.find(filter)
@@ -438,6 +445,7 @@ router.put("/:id/approve", verifyToken, async (req, res) => {
     const hashed = hashToken(rawToken);
 
     bloodBank.status = "approved";
+    bloodBank.isVerified = true;
     bloodBank.passwordToken = hashed;
     bloodBank.passwordTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     bloodBank.verifiedBy = req.admin.id;
@@ -595,6 +603,7 @@ router.post("/set-password", async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     bloodBank.password = await bcrypt.hash(password, salt);
     bloodBank.status = "active";
+    bloodBank.isVerified = true;
     bloodBank.passwordSetAt = new Date();
     bloodBank.passwordToken = null; // Single-use invalidation
     bloodBank.passwordTokenExpiresAt = null;
@@ -947,18 +956,163 @@ router.put("/:id/status", verifyToken, async (req, res) => {
       });
     }
 
-    if (status === "active") {
+    if (status === "approved" || status === "active") {
       bloodBank.isVerified = true;
       if (!bloodBank.verifiedAt) {
         bloodBank.verifiedAt = new Date();
         bloodBank.verifiedBy = req.admin.id;
       }
+    } else if (["rejected", "suspended", "blocked"].includes(status)) {
+      bloodBank.isVerified = false;
     }
 
     await bloodBank.save();
     res.json({ success: true, message: `Status updated to ${status} successfully.`, data: bloodBank });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error updating status", error: error.message });
+  }
+});
+
+/* ======================================================
+   API 15: Admin — Update Full Blood Bank Details
+   PUT /api/blood-bank/:id
+   Auth: admin
+====================================================== */
+router.put("/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const bloodBank = await BloodBank.findById(id);
+    if (!bloodBank) {
+      return res.status(404).json({ success: false, message: "Blood bank not found." });
+    }
+
+    const {
+      name,
+      bloodBankName,
+      managerName,
+      email,
+      mobile,
+      licenseNumber,
+      licenseExpiryDate,
+      city,
+      state,
+      address,
+      pincode,
+      emergencyContact,
+      is24x7,
+      openTime,
+      closeTime,
+      latitude,
+      longitude,
+      status,
+      isVerified,
+    } = req.body;
+
+    const finalName = name || bloodBankName;
+    if (finalName) bloodBank.name = finalName.trim();
+    if (managerName) bloodBank.managerName = managerName.trim();
+
+    // Check unique email/mobile/license if changed
+    if (email && email.toLowerCase().trim() !== bloodBank.email) {
+      const existing = await BloodBank.findOne({ email: email.toLowerCase().trim(), _id: { $ne: id } });
+      if (existing) {
+        return res.status(400).json({ success: false, message: "Email is already in use by another blood bank." });
+      }
+      bloodBank.email = email.toLowerCase().trim();
+    }
+
+    if (mobile && mobile.trim() !== bloodBank.mobile) {
+      const existing = await BloodBank.findOne({ mobile: mobile.trim(), _id: { $ne: id } });
+      if (existing) {
+        return res.status(400).json({ success: false, message: "Mobile number is already in use by another blood bank." });
+      }
+      bloodBank.mobile = mobile.trim();
+    }
+
+    if (licenseNumber && licenseNumber.trim() !== bloodBank.licenseNumber) {
+      const existing = await BloodBank.findOne({ licenseNumber: licenseNumber.trim(), _id: { $ne: id } });
+      if (existing) {
+        return res.status(400).json({ success: false, message: "License number is already in use by another blood bank." });
+      }
+      bloodBank.licenseNumber = licenseNumber.trim();
+    }
+
+    if (city !== undefined) bloodBank.city = city.trim();
+    if (state !== undefined) bloodBank.state = state.trim();
+    if (address !== undefined) bloodBank.address = address.trim();
+    if (pincode !== undefined) bloodBank.pincode = pincode.trim();
+    if (emergencyContact !== undefined) bloodBank.emergencyContact = emergencyContact.trim();
+
+    if (is24x7 !== undefined) {
+      bloodBank.is24x7 = is24x7 === true || is24x7 === "true";
+    }
+    if (openTime !== undefined) bloodBank.openTime = openTime;
+    if (closeTime !== undefined) bloodBank.closeTime = closeTime;
+
+    if (licenseExpiryDate !== undefined) {
+      bloodBank.licenseExpiryDate = licenseExpiryDate ? new Date(licenseExpiryDate) : null;
+    }
+
+    // Coordinates update
+    if (latitude !== undefined && longitude !== undefined && latitude !== "" && longitude !== "") {
+      const latNum = parseFloat(latitude);
+      const lngNum = parseFloat(longitude);
+      if (!isNaN(latNum) && !isNaN(lngNum)) {
+        bloodBank.latitude = latNum;
+        bloodBank.longitude = lngNum;
+        bloodBank.location = {
+          type: "Point",
+          coordinates: [lngNum, latNum],
+        };
+      }
+    }
+
+    // Status / Verification update
+    if (status) {
+      bloodBank.status = status;
+      if (status === "active" || status === "approved") {
+        bloodBank.isVerified = true;
+      }
+    }
+    if (isVerified !== undefined) {
+      bloodBank.isVerified = isVerified === true || isVerified === "true";
+    }
+
+    bloodBank.statusHistory.push({
+      status: bloodBank.status,
+      action: "Edited by Admin",
+      note: "Details updated directly from Admin Blood Banks Management panel.",
+      updatedBy: req.admin?.email || "Admin",
+      updatedAt: new Date(),
+    });
+
+    await bloodBank.save();
+
+    res.json({
+      success: true,
+      message: "Blood bank updated successfully!",
+      data: bloodBank,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error updating blood bank", error: error.message });
+  }
+});
+
+/* ======================================================
+   API 16: Admin — Delete Blood Bank
+   DELETE /api/blood-bank/:id
+   Auth: admin
+====================================================== */
+router.delete("/:id", verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await BloodBank.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: "Blood bank not found." });
+    }
+    res.json({ success: true, message: "Blood bank deleted successfully." });
+  } catch (error) {
+    res.status(500).json({ success: false, message: "Server error deleting blood bank", error: error.message });
   }
 });
 

@@ -519,7 +519,7 @@ router.get("/nearby", async (req, res) => {
     if (isNaN(userLat) || isNaN(userLng) || isNaN(radiusInMeters)) {
       return res.status(400).json({ success: false, message: "Invalid coordinates or radius" });
     }
-    const matchQuery = { status: { $in: ["approved", "active"] }, isVerified: true };
+    const matchQuery = { status: { $in: ["approved", "active"] } };
     if (bloodGroup && bloodGroup !== "All") {
       const validGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
       if (validGroups.includes(bloodGroup)) {
@@ -533,25 +533,32 @@ router.get("/nearby", async (req, res) => {
       }
     }
 
-    if (search) {
-      const searchRegex = new RegExp(search, "i");
+    if (search && search.trim()) {
+      const searchRegex = new RegExp(search.trim(), "i");
       matchQuery.$or = [
         { name: searchRegex },
         { address: searchRegex },
-        { city: searchRegex }
+        { city: searchRegex },
+        { state: searchRegex }
       ];
     }
 
-    const bloodBanks = await BloodBank.aggregate([
-      {
-        $geoNear: {
-          near: { type: "Point", coordinates: [userLng, userLat] },
-          distanceField: "distanceMeters",
-          maxDistance: radiusInMeters,
-          query: matchQuery,
-          spherical: true,
-        },
+    const geoNearStage = {
+      $geoNear: {
+        near: { type: "Point", coordinates: [userLng, userLat] },
+        distanceField: "distanceMeters",
+        query: matchQuery,
+        spherical: true,
       },
+    };
+
+    // If search term is provided, allow search results anywhere across cities/states; otherwise use selected radius
+    if (!search || !search.trim()) {
+      geoNearStage.$geoNear.maxDistance = radiusInMeters;
+    }
+
+    const pipeline = [
+      geoNearStage,
       {
         $project: {
           password: 0,
@@ -559,10 +566,31 @@ router.get("/nearby", async (req, res) => {
           passwordSetupTokenExpires: 0
         }
       }
-    ]);
+    ];
+
+    let bloodBanks = [];
+    try {
+      bloodBanks = await BloodBank.aggregate(pipeline);
+    } catch (aggErr) {
+      console.warn("Aggregate geoNear failed, falling back to standard find:", aggErr.message);
+      bloodBanks = await BloodBank.find(matchQuery).select("-password -passwordSetupToken -passwordSetupTokenExpires").lean();
+    }
+
+    // Also include any matching blood banks from find() that didn't have valid coordinates in geoNear
+    if (search && search.trim()) {
+      const existingIds = new Set(bloodBanks.map(b => b._id.toString()));
+      const fallbackBanks = await BloodBank.find(matchQuery).select("-password -passwordSetupToken -passwordSetupTokenExpires").lean();
+      for (const fb of fallbackBanks) {
+        if (!existingIds.has(fb._id.toString())) {
+          fb.distanceMeters = 0;
+          bloodBanks.push(fb);
+        }
+      }
+    }
 
     const data = bloodBanks.map((bb) => {
-      bb.distanceKm = Number((bb.distanceMeters / 1000).toFixed(2));
+      const rawDistance = bb.distanceMeters !== undefined ? bb.distanceMeters : 0;
+      bb.distanceKm = Number((rawDistance / 1000).toFixed(2));
       bb.inventorySummary = getInventorySummary(bb.inventory);
       return bb;
     });
