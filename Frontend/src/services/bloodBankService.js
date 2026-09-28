@@ -29,6 +29,18 @@ const bloodBankService = {
     return res.data;
   },
 
+  // Get active cities
+  getCities: async () => {
+    const res = await api.get("/cities");
+    return res.data;
+  },
+
+  // Get distinct states from cities
+  getStates: async () => {
+    const res = await api.get("/cities/states");
+    return res.data;
+  },
+
   // Set password using token
   setPassword: async (data) => {
     const res = await api.post(`/blood-bank/set-password`, data);

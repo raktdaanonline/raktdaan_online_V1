@@ -47,6 +47,33 @@ router.get("/", async (req, res) => {
   }
 });
 
+/* ── GET /api/cities/states (Public Unique States from Cities) ── */
+router.get("/states", async (req, res) => {
+  try {
+    const cities = await City.find({ state: { $exists: true, $ne: "" } })
+      .select("state")
+      .lean();
+    
+    const seen = new Set();
+    const uniqueStates = [];
+
+    for (const item of cities) {
+      if (!item.state || typeof item.state !== "string") continue;
+      const trimmed = item.state.trim();
+      const lower = trimmed.toLowerCase();
+      if (trimmed && !seen.has(lower)) {
+        seen.add(lower);
+        uniqueStates.push(trimmed);
+      }
+    }
+
+    uniqueStates.sort((a, b) => a.localeCompare(b));
+    res.json({ success: true, count: uniqueStates.length, data: uniqueStates });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Error fetching states", error: err.message });
+  }
+});
+
 /* ── GET /api/cities/admin/all (Admin All Cities) ── */
 router.get("/admin/all", verifyToken, async (req, res) => {
   try {

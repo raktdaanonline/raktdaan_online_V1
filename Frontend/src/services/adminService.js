@@ -131,6 +131,10 @@ const adminService = {
     const res = await api.get("/cities");
     return res.data;
   },
+  getStates: async () => {
+    const res = await api.get("/cities/states");
+    return res.data;
+  },
   getAllCitiesAdmin: async (params) => {
     const res = await api.get("/cities/admin/all", { params });
     return res.data;

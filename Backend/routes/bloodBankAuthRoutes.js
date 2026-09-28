@@ -187,6 +187,16 @@ router.get("/verify-invite", async (req, res) => {
       return res.status(410).json({ success: false, message: "Link expired — admin se naya invite maango." });
     }
 
+    let prefilledState = bloodBank.state || "";
+    if (!prefilledState && bloodBank.city) {
+      const cityDoc = await City.findOne({
+        name: new RegExp(`^${bloodBank.city.trim()}$`, "i"),
+      });
+      if (cityDoc && cityDoc.state) {
+        prefilledState = cityDoc.state;
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -195,6 +205,7 @@ router.get("/verify-invite", async (req, res) => {
         email: bloodBank.email,
         mobile: bloodBank.mobile,
         city: bloodBank.city,
+        state: prefilledState,
         licenseNumber: bloodBank.licenseNumber,
       },
     });

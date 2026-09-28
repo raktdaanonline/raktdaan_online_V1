@@ -4,16 +4,6 @@ import { Building2, User, Mail, Phone, MapPin, Clock, FileText, CheckCircle, Ale
 import toast from "react-hot-toast";
 import bloodBankService from "../services/bloodBankService";
 
-const INDIAN_STATES = [
-  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", 
-  "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", 
-  "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", 
-  "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", 
-  "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands", 
-  "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir", 
-  "Ladakh", "Lakshadweep", "Puducherry"
-];
-
 export default function BloodBankRegister() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -24,6 +14,7 @@ export default function BloodBankRegister() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [geolocating, setGeolocating] = useState(false);
+  const [statesList, setStatesList] = useState([]);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -47,6 +38,48 @@ export default function BloodBankRegister() {
   const [filePreview, setFilePreview] = useState(null);
 
   useEffect(() => {
+    loadDynamicStates();
+  }, []);
+
+  const loadDynamicStates = async () => {
+    try {
+      const [statesRes, citiesRes] = await Promise.allSettled([
+        bloodBankService.getStates(),
+        bloodBankService.getCities(),
+      ]);
+
+      const allStates = [];
+
+      if (statesRes.status === "fulfilled" && statesRes.value?.success && Array.isArray(statesRes.value.data)) {
+        allStates.push(...statesRes.value.data);
+      }
+      if (citiesRes.status === "fulfilled" && citiesRes.value?.success && Array.isArray(citiesRes.value.data)) {
+        const fromCities = citiesRes.value.data.map((c) => c.state?.trim()).filter(Boolean);
+        allStates.push(...fromCities);
+      }
+
+      // Case-insensitive deduplication so duplicate states appear only ONCE
+      const seen = new Set();
+      const uniqueStates = [];
+
+      for (const st of allStates) {
+        if (!st || typeof st !== "string") continue;
+        const trimmed = st.trim();
+        const lower = trimmed.toLowerCase();
+        if (trimmed && !seen.has(lower)) {
+          seen.add(lower);
+          uniqueStates.push(trimmed);
+        }
+      }
+
+      uniqueStates.sort((a, b) => a.localeCompare(b));
+      setStatesList(uniqueStates);
+    } catch (err) {
+      console.warn("Could not load dynamic states from backend:", err);
+    }
+  };
+
+  useEffect(() => {
     if (!inviteToken) {
       setTokenStatus("invalid");
       setErrorMessage("Invitation link is missing. Admin se naya invite maangein.");
@@ -59,6 +92,23 @@ export default function BloodBankRegister() {
     try {
       const res = await bloodBankService.verifyInviteToken(inviteToken);
       if (res.success && res.data) {
+        let prefilledState = res.data.state || "";
+        if (!prefilledState && res.data.city) {
+          try {
+            const citiesRes = await bloodBankService.getCities();
+            if (citiesRes?.success && Array.isArray(citiesRes.data)) {
+              const matched = citiesRes.data.find(
+                (c) => c.name?.trim().toLowerCase() === res.data.city.trim().toLowerCase()
+              );
+              if (matched?.state) {
+                prefilledState = matched.state;
+              }
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+
         setFormData((prev) => ({
           ...prev,
           name: res.data.name || prev.name,
@@ -66,6 +116,7 @@ export default function BloodBankRegister() {
           email: res.data.email || prev.email,
           mobile: res.data.mobile || prev.mobile,
           city: res.data.city || prev.city,
+          state: prefilledState || prev.state,
           licenseNumber: res.data.licenseNumber || prev.licenseNumber,
         }));
         setTokenStatus("valid");
@@ -345,9 +396,12 @@ export default function BloodBankRegister() {
                   className="w-full px-4 py-2.5 bg-[#181827] border border-zinc-700 rounded-lg focus:outline-none focus:border-[#E24B4A] transition-all text-white text-sm"
                 >
                   <option value="">Select State</option>
-                  {INDIAN_STATES.map((state) => (
+                  {statesList.map((state) => (
                     <option key={state} value={state}>{state}</option>
                   ))}
+                  {formData.state && !statesList.includes(formData.state) && (
+                    <option value={formData.state}>{formData.state}</option>
+                  )}
                 </select>
               </div>
               <div>
