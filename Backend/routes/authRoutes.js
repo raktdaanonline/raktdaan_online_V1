@@ -66,6 +66,9 @@ export const requireRole = (...roles) => {
   };
 };
 
+import Otp from "../models/Otp.js";
+import { sendOtpSms } from "../utils/smsService.js";
+
 // Check if mobile number exists in database
 router.post("/check-mobile", async (req, res) => {
   try {
@@ -73,7 +76,15 @@ router.post("/check-mobile", async (req, res) => {
     if (!mobile) {
       return res.status(400).json({ success: false, message: "Mobile number is required" });
     }
-    const user = await User.findOne({ mobile });
+    const cleanMobile = mobile.toString().replace(/\D/g, "").slice(-10);
+    const user = await User.findOne({
+      $or: [
+        { mobile: cleanMobile },
+        { mobile: `+91${cleanMobile}` },
+        { mobile: `+91 ${cleanMobile}` },
+        { mobile: new RegExp(cleanMobile + "$") }
+      ]
+    });
     if (user) {
       return res.json({
         exists: true,
@@ -93,16 +104,136 @@ router.post("/check-mobile", async (req, res) => {
   }
 });
 
-// Register or Login User after successful Firebase OTP verification
+// Send OTP via SMS
+router.post("/send-otp", async (req, res) => {
+  try {
+    const { mobile } = req.body;
+    if (!mobile) {
+      return res.status(400).json({ success: false, message: "Mobile number is required" });
+    }
+
+    const cleanMobile = mobile.toString().replace(/\D/g, "").slice(-10);
+    if (cleanMobile.length !== 10) {
+      return res.status(400).json({ success: false, message: "Please provide a valid 10-digit mobile number" });
+    }
+
+    // Generate random 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+
+    // Upsert OTP record
+    await Otp.deleteMany({ mobile: cleanMobile });
+    await Otp.create({
+      mobile: cleanMobile,
+      otp,
+      expiresAt,
+      attempts: 0
+    });
+
+    console.log(`[AUTH] Generated OTP for +91 ${cleanMobile}: ${otp}`);
+
+    // Send SMS via Dreamz Technology gateway
+    const smsRes = await sendOtpSms(cleanMobile, otp);
+
+    if (!smsRes.success) {
+      console.error("[AUTH] SMS dispatch failed:", smsRes.error);
+      return res.status(500).json({
+        success: false,
+        message: `SMS could not be delivered: ${smsRes.error || "Gateway error"}`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `OTP sent successfully to +91 ${cleanMobile}`,
+      messageId: smsRes.messageId
+    });
+  } catch (err) {
+    console.error("send-otp error:", err);
+    res.status(500).json({ success: false, message: "Server error sending OTP" });
+  }
+});
+
+// Verify OTP directly
+router.post("/verify-otp", async (req, res) => {
+  try {
+    const { mobile, otp } = req.body;
+    if (!mobile || !otp) {
+      return res.status(400).json({ success: false, message: "Mobile and OTP are required" });
+    }
+
+    const cleanMobile = mobile.toString().replace(/\D/g, "").slice(-10);
+    const otpValue = otp.toString().trim();
+
+    const isDevBypass = process.env.NODE_ENV === "development" && otpValue === "123456";
+
+    if (!isDevBypass) {
+      const record = await Otp.findOne({ mobile: cleanMobile });
+      if (!record) {
+        return res.status(400).json({ success: false, message: "OTP expired or not requested. Please request a new OTP." });
+      }
+      if (new Date() > record.expiresAt) {
+        await Otp.deleteOne({ _id: record._id });
+        return res.status(400).json({ success: false, message: "OTP has expired. Please request a new OTP." });
+      }
+      if (record.attempts >= 5) {
+        await Otp.deleteOne({ _id: record._id });
+        return res.status(400).json({ success: false, message: "Too many incorrect attempts. Please request a new OTP." });
+      }
+      if (record.otp !== otpValue) {
+        record.attempts = (record.attempts || 0) + 1;
+        await record.save();
+        return res.status(400).json({ success: false, message: "Invalid OTP. Please check and try again." });
+      }
+    }
+
+    return res.status(200).json({ success: true, message: "OTP verified successfully" });
+  } catch (err) {
+    console.error("verify-otp error:", err);
+    res.status(500).json({ success: false, message: "Server error verifying OTP" });
+  }
+});
+
+// Register or Login User after successful OTP verification
 router.post("/register", async (req, res) => {
   try {
-    const { name, mobile, bloodGroup, city, state, role, age, weight } = req.body;
+    const { name, mobile, bloodGroup, city, state, role, age, weight, otp, isLogin } = req.body;
 
     if (!mobile) {
       return res.status(400).json({ success: false, message: "Mobile number is required" });
     }
 
-    if (role === "donor" || (!role && req.body.isLogin === false)) {
+    const cleanMobile = mobile.toString().replace(/\D/g, "").slice(-10);
+
+    // Verify OTP if provided
+    if (otp) {
+      const otpValue = otp.toString().trim();
+      const isDevBypass = process.env.NODE_ENV === "development" && otpValue === "123456";
+
+      if (!isDevBypass) {
+        const record = await Otp.findOne({ mobile: cleanMobile });
+        if (!record) {
+          return res.status(400).json({ success: false, message: "OTP has expired or was not requested. Please request a new OTP." });
+        }
+        if (new Date() > record.expiresAt) {
+          await Otp.deleteOne({ _id: record._id });
+          return res.status(400).json({ success: false, message: "OTP has expired. Please request a new OTP." });
+        }
+        if (record.attempts >= 5) {
+          await Otp.deleteOne({ _id: record._id });
+          return res.status(400).json({ success: false, message: "Too many incorrect attempts. Please request a new OTP." });
+        }
+        if (record.otp !== otpValue) {
+          record.attempts = (record.attempts || 0) + 1;
+          await record.save();
+          return res.status(400).json({ success: false, message: "Invalid OTP. Please check and try again." });
+        }
+        // Consumed successfully
+        await Otp.deleteOne({ _id: record._id });
+      }
+    }
+
+    if (role === "donor" || (!role && isLogin === false)) {
       if (age && parseInt(age) < 18) {
         return res.status(400).json({ success: false, message: "We appreciate your willingness to save lives, but you do not meet the minimum eligibility requirements to register on this platform." });
       }
@@ -112,10 +243,17 @@ router.post("/register", async (req, res) => {
     }
 
     // Check if user already exists
-    let user = await User.findOne({ mobile });
+    let user = await User.findOne({
+      $or: [
+        { mobile: cleanMobile },
+        { mobile: `+91${cleanMobile}` },
+        { mobile: `+91 ${cleanMobile}` },
+        { mobile: new RegExp(cleanMobile + "$") }
+      ]
+    });
 
     if (!user) {
-      if (req.body.isLogin) {
+      if (isLogin) {
         return res.status(400).json({ success: false, message: "Mobile number is not registered. Please register first." });
       }
       if (!name || !bloodGroup) {
@@ -124,7 +262,7 @@ router.post("/register", async (req, res) => {
       // Create new user
       user = new User({
         name,
-        mobile,
+        mobile: cleanMobile,
         bloodGroup,
         city,
         state,

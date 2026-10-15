@@ -37,13 +37,27 @@ const OtpVerify = () => {
 
     // Auto focus next
     if (value !== "" && index < 5) {
-      inputRefs.current[index + 1].focus();
+      inputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handlePaste = (e) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (pastedData) {
+      const newOtp = [...otp];
+      for (let i = 0; i < 6; i++) {
+        newOtp[i] = pastedData[i] || "";
+      }
+      setOtp(newOtp);
+      const focusIndex = Math.min(pastedData.length, 5);
+      inputRefs.current[focusIndex]?.focus();
     }
   };
 
   const handleKeyDown = (index, e) => {
     if (e.key === "Backspace" && otp[index] === "" && index > 0) {
-      inputRefs.current[index - 1].focus();
+      inputRefs.current[index - 1]?.focus();
     }
   };
 
@@ -155,6 +169,7 @@ const OtpVerify = () => {
                 value={digit}
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
+                onPaste={handlePaste}
                 className="w-11 h-14 sm:w-12 sm:h-14 bg-[#141414] border border-zinc-800 rounded-xl text-center text-xl font-bold text-white focus:border-red-500/80 focus:ring-1 focus:ring-red-500/50 outline-none transition-all shadow-inner"
               />
             ))}
