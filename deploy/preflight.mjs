@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { resolve4, resolve6 } from 'node:dns/promises';
 import { readFileSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { validateRazorpayConfig } from '../Backend/config/razorpayMode.js';
 
 export function validateDns(records, ipv6 = []) {
   assert.deepEqual([...new Set(records)].sort(), ['200.234.45.233'], 'DNS A records must resolve only to 200.234.45.233');
@@ -12,14 +13,14 @@ export function validateEnvironment(text) {
     const i = l.indexOf('='); return [l.slice(0, i).trim(), l.slice(i + 1).trim().replace(/^['"]|['"]$/g, '')];
   }));
   const required = ['MONGO_URI', 'DB_NAME', 'JWT_SECRET', 'ADMIN_EMAIL', 'ADMIN_PASSWORD', 'SMTP_USER', 'SMTP_PASS',
-    'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'GEMINI_API_KEY', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'];
+    'CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET', 'GEMINI_API_KEY', 'RAZORPAY_MODE', 'RAZORPAY_KEY_ID', 'RAZORPAY_KEY_SECRET'];
   const missing = required.filter(k => !values[k] || /^(your|change|replace|<)/i.test(values[k]));
   assert.equal(missing.length, 0, `Missing/placeholder production values: ${missing.join(', ')}`);
   assert.ok(values.JWT_SECRET.length >= 32, 'JWT_SECRET must be an existing strong secret (at least 32 characters)');
   assert.match(values.MONGO_URI, /^mongodb(?:\+srv)?:\/\//);
   if (values.FRONTEND_URL) assert.equal(values.FRONTEND_URL, 'https://bloodinfo.in');
   if (values.PORT) assert.equal(values.PORT, '5000');
-  assert.doesNotMatch(values.RAZORPAY_KEY_ID, /^rzp_test_/, 'Configure live payment credentials before production');
+  validateRazorpayConfig(values);
   return true;
 }
 

@@ -44,7 +44,7 @@ start bloodinfo_ci_backend --network-alias bloodinfo_backend \
   --env PORT=5000 --env NODE_ENV=test --env FRONTEND_URL=https://bloodinfo.in \
   --env JWT_SECRET=bloodinfo-ci-only-not-a-production-secret \
   --env ADMIN_EMAIL=ci@example.invalid --env ADMIN_PASSWORD=ci-only-fixture \
-  --env GEMINI_API_KEY=ci-only-fixture --env RAZORPAY_KEY_ID=rzp_test_ci \
+  --env GEMINI_API_KEY=ci-only-fixture --env RAZORPAY_MODE=test --env RAZORPAY_KEY_ID=rzp_test_ci \
   --env RAZORPAY_KEY_SECRET=ci-only-fixture "bloodinfo-backend:$sha"
 start bloodinfo_ci_frontend --network-alias bloodinfo_frontend "bloodinfo-frontend:$sha"
 start bloodinfo_ci_admin --network-alias bloodinfo_admin "bloodinfo-admin:$sha"

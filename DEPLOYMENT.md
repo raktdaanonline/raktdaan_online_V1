@@ -39,10 +39,26 @@ Production files stay outside releases and are never transferred by CI:
 - /opt/bloodinfo-app/shared/Backend/.env (copy Backend/.env.example)
 
 Create these with restricted permissions (600). Configure real MongoDB, JWT,
-admin, SMTP, Cloudinary, Gemini and live Razorpay values; placeholders fail
+admin, SMTP, Cloudinary, Gemini and mode-matched Razorpay values; placeholders fail
 preflight. Keep the existing DB_NAME and MongoDB data. There is no database
 rename, automatic migration or additional production MongoDB/Redis container.
 The deployment does not use or overwrite the developer's local Backend/.env.
+
+Razorpay TEST mode is explicitly allowed for the current launch. Add this line
+to /opt/bloodinfo-app/shared/Backend/.env (the backend's Compose env_file):
+
+    RAZORPAY_MODE=test
+
+Keep the existing test credentials unchanged: RAZORPAY_KEY_ID must start with
+rzp_test_ and RAZORPAY_KEY_SECRET must be non-empty. Both preflight and backend
+startup validate the mode/key pair. Test credentials use Razorpay's sandbox;
+no real money is charged in [Test mode](https://github.com/razorpay/markdown-docs/blob/master/payments/dashboard/test-live-modes.md).
+No frontend mode setting or separate Razorpay URL is needed.
+
+When intentionally enabling real payments later, set RAZORPAY_MODE=live and
+provide an rzp_live_ key and its secret together. Missing/unknown modes,
+cross-mode keys, missing keys and missing secrets fail validation. This setting
+does not change DNS, database, JWT, Nginx, Docker, deployment-gate or SSL checks.
 
 | GitHub Actions secret | Required value |
 | --- | --- |
