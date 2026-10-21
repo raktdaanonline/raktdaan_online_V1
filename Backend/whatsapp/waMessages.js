@@ -52,7 +52,7 @@ ${E.lock} *Login Credentials:*
 ${E.mail} Email: ${email}
 Password: *${tempPassword}*
 
-${E.phone} Login: raktdaan.online/organizer-login
+${E.phone} Login: bloodinfo.in/organizer-login
 
 ${E.warn} _Password must be changed._
 
@@ -118,7 +118,7 @@ ${E.blood} Units collected: *${units}*
 ${E.heart} Lives saved: *${livesSaved}*
 
 Certificate is available on dashboard.
-raktdaan.online/organizer-dashboard
+bloodinfo.in/organizer-dashboard
 
 Thank you! ${E.trophy}
 _Raktdaan Team_`.trim(),
@@ -154,7 +154,7 @@ _Raktdaan Emergency_`.trim(),
 ${E.cal} ${campDate}
 ${E.pin} ${venue}
 
-Join us and save a life! Register Now.r: raktdaan.online/camps/${campId}
+Join us and save a life! Register Now.r: bloodinfo.in/camps/${campId}
 
 _Raktdaan_`.trim(),
 

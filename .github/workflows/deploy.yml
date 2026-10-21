@@ -1,97 +1,109 @@
-name: Deploy to Production
+name: BloodInfo production
 
 on:
   push:
-    branches:
-      - main
+    branches: [main, 'bloodinfo/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: bloodinfo-production
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    name: Build & Deploy
+  validate:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build & push Backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./Backend
-          file: ./Backend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/raktdaan-backend:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & push Frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./Frontend
-          file: ./Frontend/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/raktdaan-frontend:latest
-          build-args: |
-            VITE_APP_API_URL=https://raktdaan.online/api
-            VITE_SOCKET_URL=https://raktdaan.online
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build & push Admin image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./admin
-          file: ./admin/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/raktdaan-admin:latest
-          build-args: |
-            VITE_APP_API_URL=https://admin.raktdaan.online/api
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Deploy on VPS via SSH
-        uses: appleboy/ssh-action@v1.0.3
+          node-version: '20'
+      - name: Routing, isolation and safety regression tests
+        run: |
+          npm ci --prefix deploy --no-audit --no-fund
+          npm test --prefix deploy
+          for script in scripts/*.sh; do bash -n "$script"; done
+      - name: Validate and build exact release images
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_COMMIT: ${{ github.sha }}
+          BLOODINFO_APP_ENV: ${{ github.workspace }}/Backend/.env.example
+          COMPOSE_PARALLEL_LIMIT: '1'
+        run: |
+          docker compose -p bloodinfo config --quiet
+          docker compose -p bloodinfo build
+      - name: Real container routing and existing backend tests
+        run: bash scripts/test-routing.sh '${{ github.sha }}'
+      - name: Package exact tested commit (no env or local build output)
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          mkdir -p release
+          git archive --format=tar "$RELEASE_SHA" | gzip > "release/bloodinfo-$RELEASE_SHA.tar.gz"
+          cd release
+          sha256sum "bloodinfo-$RELEASE_SHA.tar.gz" > "bloodinfo-$RELEASE_SHA.sha256"
+      - uses: actions/upload-artifact@v4
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT }}
-          envs: GITHUB_TOKEN
-          script: |
-            set -e
+          name: bloodinfo-${{ github.sha }}
+          path: release/
+          retention-days: 7
 
-            APP_DIR="${{ secrets.VPS_APP_DIR || '/var/www/raktdaan_online_V1' }}"
-            cd "$APP_DIR"
-
-            export DOCKER_USERNAME="${{ secrets.DOCKER_USERNAME }}"
-
-            # Pull latest code from GitHub.
-            GIT_AUTH=$(printf 'x-access-token:%s' "$GITHUB_TOKEN" | base64 -w 0)
-            git -c http.extraheader="AUTHORIZATION: basic $GIT_AUTH" fetch origin main
-            git reset --hard origin/main
-
-            COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
-
-            # Pull and run the images that were just pushed by this workflow.
-            $COMPOSE pull backend frontend admin
-            $COMPOSE up -d --force-recreate --no-build backend frontend admin
-
-            # Reload gateway nginx when it exists; app deploy should not fail if it is external.
-            docker exec master-gateway nginx -s reload || true
-
-            docker image prune -f
-            echo "Deployment complete!"
+  deploy:
+    needs: [validate]
+    # Enable only after server .env, data migration and DNS have been reviewed.
+    if: ${{ github.ref == 'refs/heads/main' && vars.BLOODINFO_DEPLOY_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bloodinfo-${{ github.sha }}
+          path: release
+      - name: Transfer verified release and run safe BloodInfo-only deployment
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test "$VPS_HOST" = 200.234.45.233
+          test "$VPS_USER" = root
+          test "$VPS_PORT" = 22
+          test "$DEPLOY_PATH" = /opt/bloodinfo-app
+          test -n "$VPS_SSH_KEY"
+          test -n "$VPS_KNOWN_HOSTS"
+          [[ "$RELEASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          install -d -m 700 "$RUNNER_TEMP/bloodinfo-ssh"
+          printf '%s\n' "$VPS_SSH_KEY" > "$RUNNER_TEMP/bloodinfo-ssh/key"
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > "$RUNNER_TEMP/bloodinfo-ssh/known_hosts"
+          chmod 600 "$RUNNER_TEMP/bloodinfo-ssh/key" "$RUNNER_TEMP/bloodinfo-ssh/known_hosts"
+          trap 'rm -f "$RUNNER_TEMP/bloodinfo-ssh/key"' EXIT
+          ssh_options=(-i "$RUNNER_TEMP/bloodinfo-ssh/key" -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/bloodinfo-ssh/known_hosts")
+          ssh "${ssh_options[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" 'mkdir -p /opt/bloodinfo-app/incoming /opt/bloodinfo-app/releases'
+          scp "${ssh_options[@]}" -P "$VPS_PORT" "release/bloodinfo-$RELEASE_SHA.tar.gz" "release/bloodinfo-$RELEASE_SHA.sha256" "$VPS_USER@$VPS_HOST:/opt/bloodinfo-app/incoming/"
+          ssh "${ssh_options[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" bash -s -- "$RELEASE_SHA" <<'REMOTE'
+          set -euo pipefail
+          sha="$1"
+          [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
+          base=/opt/bloodinfo-app
+          cd "$base/incoming"
+          sha256sum --check "bloodinfo-$sha.sha256"
+          checksum="$(cut -d ' ' -f 1 "bloodinfo-$sha.sha256")"
+          release="$base/releases/$sha"
+          if [ -e "$release" ]; then
+            test -f "$release/.bloodinfo-release-sha256"
+            test "$(cat "$release/.bloodinfo-release-sha256")" = "$checksum"
+          else
+            staging="$(mktemp -d "$base/releases/.bloodinfo-$sha-XXXXXX")"
+            tar -xzf "bloodinfo-$sha.tar.gz" -C "$staging"
+            printf '%s' "$checksum" > "$staging/.bloodinfo-release-sha256"
+            mv "$staging" "$release"
+          fi
+          SOURCE_COMMIT="$sha" bash "$release/scripts/deploy.sh"
+          REMOTE

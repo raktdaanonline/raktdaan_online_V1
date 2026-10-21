@@ -1,0 +1,12 @@
+{
+  "name": "bloodinfo-deployment-tests",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "check": "node check-config.mjs"
+  },
+  "devDependencies": {
+    "js-yaml": "4.1.0"
+  }
+}

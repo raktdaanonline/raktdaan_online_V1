@@ -6,10 +6,12 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_APP_API_URL=https://raktdaan.online/api
+ARG VITE_APP_API_URL=https://admin.bloodinfo.in/api
 
 ENV VITE_APP_API_URL=$VITE_APP_API_URL
 
+ARG SOURCE_COMMIT
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 RUN npm run build
 
 FROM nginx:alpine AS production

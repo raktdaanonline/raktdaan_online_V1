@@ -1,86 +1,92 @@
-version: "3.9"
+name: bloodinfo
 
 services:
-  backend:
+  bloodinfo_backend:
+    image: bloodinfo-backend:${SOURCE_COMMIT:?Set SOURCE_COMMIT to the release SHA}
     build:
       context: ./Backend
       dockerfile: Dockerfile
-    container_name: raktdaan-backend
+    container_name: bloodinfo_backend
     restart: unless-stopped
     env_file:
-      - ./Backend/.env
+      - ${BLOODINFO_APP_ENV:-./Backend/.env}
     environment:
-      - NODE_ENV=production
-      - PORT=5001
+      NODE_ENV: production
+      PORT: "5000"
+      FRONTEND_URL: https://bloodinfo.in
+      NODE_OPTIONS: --max-old-space-size=512
+    expose:
+      - "5000"
     volumes:
-      - uploads_data:/app/uploads
+      - bloodinfo_uploads:/app/uploads
+      - bloodinfo_sessions:/app/.sessions
     networks:
-      - raktdaan-network
+      - bloodinfo_internal
+      - goairclass_proxy
+    mem_limit: 1g
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5001/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
 
-  frontend:
+  bloodinfo_frontend:
+    image: bloodinfo-frontend:${SOURCE_COMMIT:?Set SOURCE_COMMIT to the release SHA}
     build:
       context: ./Frontend
       dockerfile: Dockerfile
       args:
-        - VITE_APP_API_URL=https://raktdaan.online/api
-        - VITE_SOCKET_URL=https://raktdaan.online
-    container_name: raktdaan-frontend
+        VITE_APP_API_URL: https://bloodinfo.in/api
+        VITE_SOCKET_URL: https://bloodinfo.in
+        SOURCE_COMMIT: ${SOURCE_COMMIT:?Set SOURCE_COMMIT}
+    container_name: bloodinfo_frontend
     restart: unless-stopped
+    expose:
+      - "80"
     networks:
-      - raktdaan-network
-    depends_on:
-      - backend
+      - bloodinfo_internal
+      - goairclass_proxy
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/bloodinfo-build.json"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
-  admin:
+  bloodinfo_admin:
+    image: bloodinfo-admin:${SOURCE_COMMIT:?Set SOURCE_COMMIT to the release SHA}
     build:
       context: ./admin
       dockerfile: Dockerfile
       args:
-        - VITE_APP_API_URL=https://admin.raktdaan.online/api
-    container_name: raktdaan-admin
+        VITE_APP_API_URL: https://admin.bloodinfo.in/api
+        SOURCE_COMMIT: ${SOURCE_COMMIT:?Set SOURCE_COMMIT}
+    container_name: bloodinfo_admin
     restart: unless-stopped
+    expose:
+      - "80"
     networks:
-      - raktdaan-network
-    depends_on:
-      - backend
-
-  nginx:
-    image: nginx:alpine
-    container_name: raktdaan-nginx
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - certbot_www:/var/www/certbot:ro
-      - certbot_certs:/etc/letsencrypt:ro
-    networks:
-      - raktdaan-network
-    depends_on:
-      - backend
-      - frontend
-      - admin
-
-  certbot:
-    image: certbot/certbot
-    container_name: raktdaan-certbot
-    volumes:
-      - certbot_www:/var/www/certbot
-      - certbot_certs:/etc/letsencrypt
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+      - bloodinfo_internal
+      - goairclass_proxy
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/bloodinfo-build.json"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  uploads_data:
-  certbot_www:
-  certbot_certs:
+  bloodinfo_uploads:
+    name: bloodinfo_uploads
+  bloodinfo_sessions:
+    name: bloodinfo_sessions
 
 networks:
-  raktdaan-network:
+  bloodinfo_internal:
+    name: bloodinfo_internal
+    internal: true
     driver: bridge
+  goairclass_proxy:
+    name: goairclass_proxy
+    external: true

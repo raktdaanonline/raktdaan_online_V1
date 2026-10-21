@@ -1,17 +1,3 @@
-version: "3.9"
-
-# Production override - uses pre-built images from Docker Hub
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-
-services:
-  backend:
-    image: ${DOCKER_USERNAME}/raktdaan-backend:latest
-    build: !reset null
-
-  frontend:
-    image: ${DOCKER_USERNAME}/raktdaan-frontend:latest
-    build: !reset null
-
-  admin:
-    image: ${DOCKER_USERNAME}/raktdaan-admin:latest
-    build: !reset null
+# Compatibility override. Production builds the exact release locally on the VPS.
+# No registry credentials or duplicate proxy services are needed.
+services: {}

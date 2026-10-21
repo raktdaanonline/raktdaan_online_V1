@@ -35,7 +35,7 @@ const job = cron.schedule("0 8 * * *", async () => {
       });
 
       // Notify admin
-      const adminEmails = process.env.ADMIN_EMAILS || "admin@raktdaan.online";
+      const adminEmails = process.env.ADMIN_EMAILS || "admin@bloodinfo.in";
       await sendEmail({
         to: adminEmails,
         subject: `⚠️ License Expiring Soon: ${bank.name}`,
@@ -90,7 +90,7 @@ const job = cron.schedule("0 8 * * *", async () => {
         });
 
         // Send email to admin
-        const adminEmails = process.env.ADMIN_EMAILS || "admin@raktdaan.online";
+        const adminEmails = process.env.ADMIN_EMAILS || "admin@bloodinfo.in";
         await sendEmail({
           to: adminEmails,
           subject: `❌ Auto-Suspended: ${bank.name} (License Expired)`,

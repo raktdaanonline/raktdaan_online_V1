@@ -34,7 +34,7 @@ const OrganizerWhatsAppConnect = () => {
     
     if (organizerId) {
       // Connect to Socket.IO backend
-      const newSocket = io(import.meta.env.VITE_SOCKET_URL || "http://localhost:5001", {
+      const newSocket = io(import.meta.env.VITE_SOCKET_URL || window.location.origin, {
         withCredentials: true,
       });
 
