@@ -35,8 +35,11 @@ import bloodUnitRoutes from "./routes/bloodUnitRoutes.js";
 import inventoryRoutes from "./routes/inventoryRoutes.js";
 import requestFlowRoutes from "./routes/requestFlowRoutes.js";
 import cityRoutes from "./routes/cityRoutes.js";
+import eventRoutes from "./routes/eventRoutes.js";
+import adminNotificationRoutes from "./routes/adminNotificationRoutes.js";
 import expiryChecker from "./cron/expiryChecker.js";
 import licenseChecker from "./cron/licenseChecker.js";
+import eventReminderScheduler from "./cron/eventReminderScheduler.js";
 
 const app = express();
 app.set("trust proxy", 1); // Trust reverse proxy to get correct protocol (https)
@@ -176,6 +179,8 @@ app.use("/api/blood-units", bloodUnitRoutes);
 app.use("/api/inventory", inventoryRoutes);
 app.use("/api/request-flow", requestFlowRoutes);
 app.use("/api/cities", cityRoutes);
+app.use("/api/admin/events", eventRoutes);
+app.use("/api/admin/notifications", adminNotificationRoutes);
 
 // SERVE FRONTEND IN PRODUCTION (Hostinger Ready)
 const frontendPath = path.join(__dirname, "../Frontend/dist");

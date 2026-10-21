@@ -9,6 +9,8 @@ import AdminBloodBanks from "../components/AdminBloodBanks.jsx";
 import AdminBloodBankRequests from "../components/AdminBloodBankRequests.jsx";
 import HomeContentAdmin from "../components/HomeContentAdmin.jsx";
 import CityManagementAdmin from "../components/CityManagementAdmin.jsx";
+import EventCalendarAdmin from "../components/EventCalendarAdmin.jsx";
+import NotificationCenter from "../components/events/NotificationCenter.jsx";
 import adminService from "../services/adminService";
 import campService from "../services/campService";
 import donorService from "../services/donorService";
@@ -1668,6 +1670,13 @@ const Admin = () => {
           >
             <span className="menu-item-icon">📰</span> <span className="menu-item-text">News & Awareness</span>
           </button>
+          <button
+            className={`menu-item ${currentView === "event-calendar" ? "active" : ""}`}
+            onClick={() => setCurrentView("event-calendar")}
+            title="Event Calendar"
+          >
+            <span className="menu-item-icon">📅</span> <span className="menu-item-text">Event Calendar</span>
+          </button>
         </div>
 
         <div className="menu-section">
@@ -1704,7 +1713,8 @@ const Admin = () => {
             </button>
           </div>
 
-          <div className="header-actions">
+          <div className="header-actions" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <NotificationCenter onNotificationClick={() => setCurrentView("event-calendar")} />
             <div className="user-profile-badge">
               <div className="user-avatar">👤</div>
               <div className="user-info">
@@ -3075,6 +3085,13 @@ const Admin = () => {
         {currentView === "cities" && (
           <div className="dashboard-details-grid pt-4">
             <CityManagementAdmin />
+          </div>
+        )}
+
+        {/* --- Event Calendar Tab View --- */}
+        {currentView === "event-calendar" && (
+          <div className="dashboard-details-grid pt-4">
+            <EventCalendarAdmin />
           </div>
         )}
 
