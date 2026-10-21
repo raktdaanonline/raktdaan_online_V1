@@ -6,12 +6,14 @@ RUN npm ci
 
 COPY . .
 
-ARG VITE_APP_API_URL=https://raktdaan.online/api
-ARG VITE_SOCKET_URL=https://raktdaan.online
+ARG VITE_APP_API_URL=https://bloodinfo.in/api
+ARG VITE_SOCKET_URL=https://bloodinfo.in
 
 ENV VITE_APP_API_URL=$VITE_APP_API_URL
 ENV VITE_SOCKET_URL=$VITE_SOCKET_URL
 
+ARG SOURCE_COMMIT
+ENV SOURCE_COMMIT=$SOURCE_COMMIT
 RUN npm run build
 
 FROM nginx:alpine AS production

@@ -1292,7 +1292,7 @@ export default function AdminBloodBanks() {
                   <div className="pt-2">
                     <span className="text-[10px] text-zinc-500 block uppercase mb-1.5">Verification Document</span>
                     <a 
-                      href={`${import.meta.env.VITE_BACKEND_URL || "http://localhost:5001"}${selectedBank.licenseDocumentUrl}`}
+                      href={`${import.meta.env.VITE_BACKEND_URL || window.location.origin}${selectedBank.licenseDocumentUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-blue-400 rounded border border-zinc-700 transition-colors cursor-pointer"

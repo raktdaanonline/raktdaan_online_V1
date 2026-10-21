@@ -340,7 +340,7 @@ router.post("/register", upload.single("licenseDocument"), async (req, res) => {
     });
 
     // Email to admin
-    const adminEmails = process.env.ADMIN_EMAILS || "admin@raktdaan.online";
+    const adminEmails = process.env.ADMIN_EMAILS || "admin@bloodinfo.in";
     await sendEmail({
       to: adminEmails,
       subject: `New Blood Bank Registration Pending: ${bloodBank.name}`,

@@ -7,6 +7,7 @@ import multer from "multer";
 import { fileURLToPath } from "url";
 
 import http from "http";
+import mongoose from "mongoose";
 import { initSocket } from "./socket.js";
 import connectDB from "./config/db.js";
 import { initializeAdmin } from "./models/Admin.js";
@@ -48,6 +49,12 @@ initSocket(server);
 
 app.use(express.json());
 
+// Readiness must include MongoDB, without sending messages or changing data.
+app.get(["/healthz", "/api/healthz"], (req, res) => {
+  const ready = mongoose.connection.readyState === 1;
+  res.status(ready ? 200 : 503).json({ app: "bloodinfo_backend", ready });
+});
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -55,9 +62,8 @@ app.use(
         "http://localhost:5173",
         "http://localhost:5174",
         "http://localhost:3000",
-        "https://raktdaan.online",
-        "https://www.raktdaan.online",
-        "https://admin.raktdaan.online",
+        "https://bloodinfo.in",
+        "https://admin.bloodinfo.in",
       ];
 
       // allow requests with no origin (like Postman)

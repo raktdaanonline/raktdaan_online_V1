@@ -19,3 +19,12 @@ Backend/uploads/
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Deployment credentials and release artifacts
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+known_hosts
+*.tar.gz
+deploy/reports/

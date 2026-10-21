@@ -299,7 +299,7 @@ router.post('/:requestId/create-payment', verifyToken, async (req, res) => {
       orderId: order.id,
       amount,
       currency: 'INR',
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_SNw35MkokY8h1y',
+      keyId: process.env.RAZORPAY_KEY_ID,
       payerName: request.patientName,
       payerMobile: request.requesterMobile || (request.recipient && request.recipient.mobile) || ''
     });
@@ -318,7 +318,7 @@ router.post('/:requestId/verify-payment', verifyToken, async (req, res) => {
     if (!request) return res.status(404).json({ success: false, message: 'Request not found' });
 
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '5swKLrcRVYl1bc512r868sqP')
+      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
       .update(razorpay_order_id + '|' + razorpay_payment_id)
       .digest('hex');
 

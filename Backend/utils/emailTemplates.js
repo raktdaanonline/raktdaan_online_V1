@@ -7,7 +7,7 @@ export const emailTemplates = {
       <p>We have received your request for a camp at <strong>${campDetails.area}</strong> on <strong>${new Date(campDetails.preferredDate).toDateString()}</strong>.</p>
       <p>Our team will review your request within 24-48 hours and contact you shortly.</p>
       <br/>
-      <p>For any queries, contact us at: support@raktdaan.com</p>
+      <p>For any queries, contact us at: support@bloodinfo.in</p>
       <p>Regards,<br/>Raktdaan Team</p>
     </div>
   `,

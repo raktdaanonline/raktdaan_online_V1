@@ -7,3 +7,5 @@ npm-debug.log
 auth_info_baileys/
 uploads/
 test*.js
+
+.sessions/
