@@ -147,14 +147,31 @@ ensure_bloodinfo_ssl() {
   fi
   [[ "${CERTBOT_EMAIL:-}" = *@* ]] || { echo 'CERTBOT_EMAIL is required before first certificate issuance'; return 1; }
   install_nginx "$RELEASE_DIR/nginx/bootstrap.conf"
-  local token content domain
+  sleep 2
+  local token content domain attempt verified res
   token="bloodinfo-$SOURCE_COMMIT"
   content="bloodinfo-acme-$SOURCE_COMMIT"
   mkdir -p "$CERTBOT_WEBROOT/.well-known/acme-challenge"
+  chmod 755 "$CERTBOT_WEBROOT" "$CERTBOT_WEBROOT/.well-known" "$CERTBOT_WEBROOT/.well-known/acme-challenge" 2>/dev/null || true
   printf '%s' "$content" > "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"
+  chmod 644 "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token" 2>/dev/null || true
   for domain in bloodinfo.in admin.bloodinfo.in hospital.bloodinfo.in; do
-    test "$(curl --fail --silent --show-error "http://$domain/.well-known/acme-challenge/$token")" = "$content" \
-      || { rm -f "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"; echo 'Public ACME challenge verification failed'; return 1; }
+    echo "Verifying ACME challenge on $domain..."
+    verified=false
+    for attempt in {1..10}; do
+      if [ "$(curl --fail --silent --show-error "http://$domain/.well-known/acme-challenge/$token" 2>/dev/null || true)" = "$content" ]; then
+        verified=true
+        echo "ACME challenge verified on $domain (attempt $attempt)"
+        break
+      fi
+      sleep 1
+    done
+    if [ "$verified" != true ]; then
+      res="$(curl --silent --show-error "http://$domain/.well-known/acme-challenge/$token" 2>&1 || true)"
+      rm -f "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"
+      echo "Public ACME challenge verification failed on $domain: $res"
+      return 1
+    fi
   done
   rm -f "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"
   run_certbot certonly --webroot --webroot-path /var/www/certbot \
