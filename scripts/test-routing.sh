@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI only: real frontend/admin/backend images, isolated disposable test database.
+# CI only: real frontend/admin/hospital/backend images, isolated disposable test database.
 # Every container remains on a dedicated test network, with ZERO published ports.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -25,7 +25,7 @@ cp nginx/conf.d/bloodinfo.conf "$reports/ci-nginx/bloodinfo.conf"
 openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
   -keyout "$reports/ci-certs/live/bloodinfo/privkey.pem" \
   -out "$reports/ci-certs/live/bloodinfo/fullchain.pem" \
-  -subj /CN=bloodinfo.in -addext 'subjectAltName=DNS:bloodinfo.in,DNS:admin.bloodinfo.in' 2> /dev/null
+  -subj /CN=bloodinfo.in -addext 'subjectAltName=DNS:bloodinfo.in,DNS:admin.bloodinfo.in,DNS:hospital.bloodinfo.in' 2> /dev/null
 start bloodinfo_ci_mongo mongo:7
 for attempt in {1..60}; do
   if docker exec bloodinfo_ci_mongo mongosh --quiet --eval 'quit(db.adminCommand({ping:1}).ok ? 0 : 1)' > /dev/null; then break; fi
@@ -42,13 +42,15 @@ docker run --rm --name bloodinfo_ci_backend_tests --network "$network" \
 start bloodinfo_ci_backend --network-alias bloodinfo_backend \
   --env MONGO_URI=mongodb://bloodinfo_ci_mongo:27017 --env DB_NAME=bloodinfo_ci_test \
   --env PORT=5000 --env NODE_ENV=test --env FRONTEND_URL=https://bloodinfo.in \
+  --env HOSPITAL_FRONTEND_URL=https://hospital.bloodinfo.in \
   --env JWT_SECRET=bloodinfo-ci-only-not-a-production-secret \
   --env ADMIN_EMAIL=ci@example.invalid --env ADMIN_PASSWORD=ci-only-fixture \
   --env GEMINI_API_KEY=ci-only-fixture --env RAZORPAY_MODE=test --env RAZORPAY_KEY_ID=rzp_test_ci \
   --env RAZORPAY_KEY_SECRET=ci-only-fixture "bloodinfo-backend:$sha"
 start bloodinfo_ci_frontend --network-alias bloodinfo_frontend "bloodinfo-frontend:$sha"
 start bloodinfo_ci_admin --network-alias bloodinfo_admin "bloodinfo-admin:$sha"
-for name in bloodinfo_ci_backend bloodinfo_ci_frontend bloodinfo_ci_admin; do
+start bloodinfo_ci_hospital --network-alias bloodinfo_hospital "bloodinfo-hospital:$sha"
+for name in bloodinfo_ci_backend bloodinfo_ci_frontend bloodinfo_ci_admin bloodinfo_ci_hospital; do
   endpoint=/bloodinfo-build.json
   if [ "$name" = bloodinfo_ci_backend ]; then endpoint=:5000/healthz; fi
   ready=false
@@ -58,7 +60,7 @@ for name in bloodinfo_ci_backend bloodinfo_ci_frontend bloodinfo_ci_admin; do
   done
   test "$ready" = true || { docker logs "$name"; exit 1; }
 done
-for app in frontend admin; do
+for app in frontend admin hospital; do
   docker exec "bloodinfo_ci_$app" wget -qO- http://127.0.0.1/bloodinfo-build.json > "$reports/$app.json"
 done
 start bloodinfo_ci_proxy \
@@ -71,4 +73,4 @@ docker run --rm --name bloodinfo_ci_probe --network "$network" \
   --mount "type=bind,src=$reports/ci-certs/live/bloodinfo,dst=/test-ca,readonly" \
   --mount "type=bind,src=$PWD,dst=/work,readonly" \
   node:20-alpine node /work/deploy/healthcheck.mjs --commit "$sha" --ip "$ip" --expected-dir /work/deploy/reports
-echo 'Docker routing integration: both separate apps, exact SHA, distinct HTML/builds and shared backend passed'
+echo 'Docker routing integration: all separate apps, exact SHA, distinct HTML/builds and shared backend passed'

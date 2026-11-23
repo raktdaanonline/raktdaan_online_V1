@@ -69,6 +69,7 @@ app.use(
         "http://localhost:3000",
         "https://bloodinfo.in",
         "https://admin.bloodinfo.in",
+        "https://hospital.bloodinfo.in",
       ];
 
       // allow requests with no origin (like Postman)

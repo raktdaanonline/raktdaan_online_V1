@@ -6,7 +6,7 @@ import yaml from 'js-yaml';
 
 export const root = fileURLToPath(new URL('../', import.meta.url));
 export const read = file => readFileSync(resolve(root, file), 'utf8');
-export const mapping = { 'bloodinfo.in': 'frontend', 'admin.bloodinfo.in': 'admin' };
+export const mapping = { 'bloodinfo.in': 'frontend', 'admin.bloodinfo.in': 'admin', 'hospital.bloodinfo.in': 'hospital' };
 
 // Parse nested blocks rather than matching across adjacent server blocks.
 export function blocks(text, pattern) {
@@ -30,7 +30,7 @@ export function blocks(text, pattern) {
 
 export function validateNginx(text, bootstrap = false) {
   const servers = blocks(text, '\\bserver');
-  assert.equal(servers.length, bootstrap ? 2 : 4, 'Separate HTTP/HTTPS blocks required');
+  assert.equal(servers.length, bootstrap ? 3 : 6, 'Separate HTTP/HTTPS blocks required');
   for (const [domain, app] of Object.entries(mapping)) {
     const matching = servers.filter(s => s.match(/server_name\s+([^;]+);/)?.[1] === domain);
     assert.equal(matching.length, bootstrap ? 1 : 2, `Exact server_name required: ${domain}`);
@@ -68,7 +68,7 @@ export function validateNginx(text, bootstrap = false) {
 
 export function validateCompose(config) {
   assert.equal(config.name, 'bloodinfo');
-  const names = ['bloodinfo_admin', 'bloodinfo_backend', 'bloodinfo_frontend'];
+  const names = ['bloodinfo_admin', 'bloodinfo_backend', 'bloodinfo_frontend', 'bloodinfo_hospital'];
   assert.deepEqual(Object.keys(config.services).sort(), names);
   for (const name of names) {
     const service = config.services[name];
@@ -82,6 +82,7 @@ export function validateCompose(config) {
   }
   assert.equal(config.services.bloodinfo_frontend.build.context, './Frontend');
   assert.equal(config.services.bloodinfo_admin.build.context, './admin');
+  assert.equal(config.services.bloodinfo_hospital.build.context, './hospital');
   assert.equal(config.services.bloodinfo_backend.build.context, './Backend');
   assert.equal(config.services.bloodinfo_backend.environment.PORT, '5000');
   assert.equal(config.services.bloodinfo_backend.environment.FRONTEND_URL, 'https://bloodinfo.in');
@@ -96,12 +97,12 @@ export function checkAll() {
   assert.deepEqual(yaml.load(read('docker-compose.prod.yml')), { services: {} });
   validateNginx(read('nginx/conf.d/bloodinfo.conf'));
   validateNginx(read('nginx/bootstrap.conf'), true);
-  for (const [folder, app] of [['Frontend', 'frontend'], ['admin', 'admin']]) {
+  for (const [folder, app] of [['Frontend', 'frontend'], ['admin', 'admin'], ['hospital', 'hospital']]) {
     const docker = read(`${folder}/Dockerfile`);
     assert.match(docker, /COPY \. \./);
     assert.match(docker, /RUN npm run build/);
     assert.match(docker, /COPY --from=builder \/app\/dist \/usr\/share\/nginx\/html/);
-    assert.doesNotMatch(docker, /COPY\s+(?:\.\.\/|.*(?:Frontend|admin)\/dist)/);
+    assert.doesNotMatch(docker, /COPY\s+(?:\.\.\/|.*(?:Frontend|admin|hospital)\/dist)/);
     assert.match(read(`${folder}/scripts/write-build-info.cjs`), new RegExp(`app: '${app}'`));
     assert.match(read(`${folder}/scripts/write-build-info.cjs`), /htmlSha256.*readFileSync/);
   }

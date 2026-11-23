@@ -76,6 +76,29 @@ services:
       timeout: 5s
       retries: 5
 
+  bloodinfo_hospital:
+    image: bloodinfo-hospital:${SOURCE_COMMIT:?Set SOURCE_COMMIT to the release SHA}
+    build:
+      context: ./hospital
+      dockerfile: Dockerfile
+      args:
+        VITE_APP_API_URL: https://hospital.bloodinfo.in/api
+        VITE_SOCKET_URL: https://hospital.bloodinfo.in
+        SOURCE_COMMIT: ${SOURCE_COMMIT:?Set SOURCE_COMMIT}
+    container_name: bloodinfo_hospital
+    restart: unless-stopped
+    expose:
+      - "80"
+    networks:
+      - bloodinfo_internal
+      - goairclass_proxy
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/bloodinfo-build.json"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   bloodinfo_uploads:
     name: bloodinfo_uploads

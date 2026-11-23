@@ -15,6 +15,7 @@ const nginx = read('nginx/conf.d/bloodinfo.conf');
 const compose = () => yaml.load(read('docker-compose.yml'));
 test('reject main domain pointing to admin', () => assert.throws(() => validateNginx(nginx.replace('set $bloodinfo_app bloodinfo_frontend:80;', 'set $bloodinfo_app bloodinfo_admin:80;'))));
 test('reject admin domain pointing to frontend', () => assert.throws(() => validateNginx(nginx.replace('set $bloodinfo_app bloodinfo_admin:80;', 'set $bloodinfo_app bloodinfo_frontend:80;'))));
+test('reject hospital domain pointing to frontend', () => assert.throws(() => validateNginx(nginx.replace('set $bloodinfo_app bloodinfo_hospital:80;', 'set $bloodinfo_app bloodinfo_frontend:80;'))));
 test('reject both apps using the same frontend upstream', () => assert.throws(() => validateNginx(nginx.replaceAll('bloodinfo_admin:80', 'bloodinfo_frontend:80'))));
 test('reject combined server_name even in HTTP redirect/bootstrap', () => {
   assert.throws(() => validateNginx(nginx.replace('server_name bloodinfo.in;', 'server_name bloodinfo.in admin.bloodinfo.in;')));
@@ -28,7 +29,11 @@ test('reject both apps built from the admin source', () => {
   const config = compose(); config.services.bloodinfo_frontend.build.context = './admin';
   assert.throws(() => validateCompose(config));
 });
-for (const name of ['bloodinfo_backend', 'bloodinfo_frontend', 'bloodinfo_admin']) {
+test('reject hospital built from the admin source', () => {
+  const config = compose(); config.services.bloodinfo_hospital.build.context = './admin';
+  assert.throws(() => validateCompose(config));
+});
+for (const name of ['bloodinfo_backend', 'bloodinfo_frontend', 'bloodinfo_admin', 'bloodinfo_hospital']) {
   test(`reject published host ports on ${name}`, () => {
     const config = compose(); config.services[name].ports = ['5000:5000'];
     assert.throws(() => validateCompose(config));
@@ -63,12 +68,13 @@ function observation(app = 'frontend') {
   const commit = 'a'.repeat(40), body = Buffer.from(`<html>${app}</html>`);
   const manifest = { app, commit, htmlSha256: createHash('sha256').update(body).digest('hex'), buildSha256: 'b'.repeat(64) };
   const response = body => ({ status: 200, headers: { 'x-bloodinfo-app': app }, body });
+  const domain = app === 'frontend' ? 'bloodinfo.in' : (app === 'admin' ? 'admin.bloodinfo.in' : 'hospital.bloodinfo.in');
   return { app, commit, head: response(Buffer.alloc(0)), html: response(body), info: response(Buffer.from(JSON.stringify(manifest))),
     api: response(Buffer.from(JSON.stringify({ app: 'bloodinfo_backend', ready: true }))),
-    redirect: { status: 301, headers: { location: `https://${app === 'frontend' ? 'bloodinfo.in' : 'admin.bloodinfo.in'}/` } }, expected: manifest };
+    redirect: { status: 301, headers: { location: `https://${domain}/` } }, expected: manifest };
 }
-test('health checker accepts both independent app observations', () => {
-  validateApp(observation('frontend')); validateApp(observation('admin'));
+test('health checker accepts all independent app observations', () => {
+  validateApp(observation('frontend')); validateApp(observation('admin')); validateApp(observation('hospital'));
 });
 test('health checker rejects wrong app header', () => {
   const o = observation(); o.head.headers['x-bloodinfo-app'] = 'admin';
@@ -89,9 +95,9 @@ test('health checker rejects redirects to the other domain', () => {
   assert.throws(() => validateApp(https));
 });
 test('health checker rejects identical HTML or build fingerprints', () => {
-  const a = observation('frontend').expected, b = observation('admin').expected;
-  assert.throws(() => assertSeparateBuilds([a, { ...b, htmlSha256: a.htmlSha256 }]));
-  assert.throws(() => assertSeparateBuilds([a, { ...b, buildSha256: a.buildSha256 }]));
+  const a = observation('frontend').expected, b = observation('admin').expected, c = observation('hospital').expected;
+  assert.throws(() => assertSeparateBuilds([a, { ...b, htmlSha256: a.htmlSha256 }, c]));
+  assert.throws(() => assertSeparateBuilds([a, { ...b, buildSha256: a.buildSha256 }, c]));
 });
 test('secrets, private keys and reports are ignored', () => {
   const ignore = read('.gitignore');
@@ -103,7 +109,7 @@ test('only owned gateway config and certificate can be changed', () => {
   assert.ok(lib.includes('NGINX_TARGET="$NGINX_CONF_DIR/bloodinfo.conf"'));
   assert.ok(lib.includes('test -s') || lib.includes('-s "$LE_CERT_SOURCE/live/bloodinfo/fullchain.pem"'));
   assert.match(lib, /Reusing dedicated BloodInfo certificate/);
-  assert.match(lib, /--cert-name bloodinfo -d bloodinfo\.in -d admin\.bloodinfo\.in/);
+  assert.match(lib, /--cert-name bloodinfo -d bloodinfo\.in -d admin\.bloodinfo\.in -d hospital\.bloodinfo\.in/);
   assert.match(lib, /DNS|preflight\.mjs/);
   for (const file of ['scripts/lib-deploy.sh', 'scripts/deploy.sh', 'scripts/renew-ssl.sh']) {
     const text = read(file);
@@ -169,7 +175,7 @@ ensure_bloodinfo_ssl`;
         assert.doesNotMatch(calls, /certbot /);
         assert.match(result.stdout, /Public ACME challenge verification failed/);
       }
-      else assert.match(calls, /certbot certonly .*--cert-name bloodinfo -d bloodinfo\.in -d admin\.bloodinfo\.in/);
+      else assert.match(calls, /certbot certonly .*--cert-name bloodinfo -d bloodinfo\.in -d admin\.bloodinfo\.in -d hospital\.bloodinfo\.in/);
     }
   });
 }

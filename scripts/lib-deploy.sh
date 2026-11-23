@@ -63,7 +63,7 @@ shared_preflight() {
   fi
   # A matching name alone does not authorize changing another project's resource.
   local name owner
-  for name in bloodinfo_backend bloodinfo_frontend bloodinfo_admin; do
+  for name in bloodinfo_backend bloodinfo_frontend bloodinfo_admin bloodinfo_hospital; do
     if docker container inspect "$name" > /dev/null 2>&1; then
       owner="$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$name")"
       test "$owner" = bloodinfo || { echo "Container $name belongs to another project; refusing deployment"; return 1; }
@@ -134,12 +134,16 @@ certificate_state() {
 
 ensure_bloodinfo_ssl() {
   if [ -s "$LE_CERT_SOURCE/live/bloodinfo/fullchain.pem" ]; then
-    echo 'Reusing dedicated BloodInfo certificate'
-    certificate_status="$(certificate_state)"
-    if [ "$certificate_status" = renew ]; then
+    echo 'Checking dedicated BloodInfo certificate'
+    certificate_status="$(certificate_state || echo 'expand')"
+    if [ "$certificate_status" = valid ]; then
+      echo 'Reusing dedicated BloodInfo certificate'
+      return
+    elif [ "$certificate_status" = renew ]; then
       run_certbot renew --cert-name bloodinfo --non-interactive
+      return
     fi
-    return
+    echo 'Certificate missing required SANs or needs expansion'
   fi
   [[ "${CERTBOT_EMAIL:-}" = *@* ]] || { echo 'CERTBOT_EMAIL is required before first certificate issuance'; return 1; }
   install_nginx "$RELEASE_DIR/nginx/bootstrap.conf"
@@ -148,12 +152,12 @@ ensure_bloodinfo_ssl() {
   content="bloodinfo-acme-$SOURCE_COMMIT"
   mkdir -p "$CERTBOT_WEBROOT/.well-known/acme-challenge"
   printf '%s' "$content" > "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"
-  for domain in bloodinfo.in admin.bloodinfo.in; do
+  for domain in bloodinfo.in admin.bloodinfo.in hospital.bloodinfo.in; do
     test "$(curl --fail --silent --show-error "http://$domain/.well-known/acme-challenge/$token")" = "$content" \
       || { rm -f "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"; echo 'Public ACME challenge verification failed'; return 1; }
   done
   rm -f "$CERTBOT_WEBROOT/.well-known/acme-challenge/$token"
   run_certbot certonly --webroot --webroot-path /var/www/certbot \
-    --cert-name bloodinfo -d bloodinfo.in -d admin.bloodinfo.in \
-    --email "$CERTBOT_EMAIL" --agree-tos --non-interactive --keep-until-expiring
+    --cert-name bloodinfo -d bloodinfo.in -d admin.bloodinfo.in -d hospital.bloodinfo.in \
+    --email "$CERTBOT_EMAIL" --agree-tos --non-interactive --expand --keep-until-expiring
 }

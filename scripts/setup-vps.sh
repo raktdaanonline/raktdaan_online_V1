@@ -12,6 +12,6 @@ Set real app credentials in /opt/bloodinfo-app/shared/Backend/.env.
 Review existing BloodInfo/Raktdaan uploads and WhatsApp sessions before enabling DATA_MIGRATION_CONFIRMED.
 Set CERTBOT_EMAIL in /opt/bloodinfo-app/deploy/.env.
 Enable server DEPLOY_ENABLED and GitHub variable BLOODINFO_DEPLOY_ENABLED only when ready.
-DNS: bloodinfo.in and admin.bloodinfo.in must resolve to 200.234.45.233.
+DNS: bloodinfo.in, admin.bloodinfo.in and hospital.bloodinfo.in must resolve to 200.234.45.233.
 Existing proxy network, gateway, certificates and unrelated applications are retained.
 INFO

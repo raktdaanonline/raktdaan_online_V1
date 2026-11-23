@@ -19,13 +19,14 @@ export function validateEnvironment(text) {
   assert.ok(values.JWT_SECRET.length >= 32, 'JWT_SECRET must be an existing strong secret (at least 32 characters)');
   assert.match(values.MONGO_URI, /^mongodb(?:\+srv)?:\/\//);
   if (values.FRONTEND_URL) assert.equal(values.FRONTEND_URL, 'https://bloodinfo.in');
+  if (values.HOSPITAL_FRONTEND_URL) assert.equal(values.HOSPITAL_FRONTEND_URL, 'https://hospital.bloodinfo.in');
   if (values.PORT) assert.equal(values.PORT, '5000');
   validateRazorpayConfig(values);
   return true;
 }
 
 export async function preflight() {
-  for (const domain of ['bloodinfo.in', 'admin.bloodinfo.in']) {
+  for (const domain of ['bloodinfo.in', 'admin.bloodinfo.in', 'hospital.bloodinfo.in']) {
     const ipv6 = await resolve6(domain).catch(e => { if (['ENODATA', 'ENOTFOUND'].includes(e.code)) return []; throw e; });
     validateDns(await resolve4(domain), ipv6);
   }
@@ -35,7 +36,7 @@ export async function preflight() {
     if (!file.endsWith('.conf') || file === 'bloodinfo.conf') continue;
     const text = readFileSync(`/central/${file}`, 'utf8').replace(/#[^\n]*/g, '');
     for (const match of text.matchAll(/server_name\s+([^;]+);/g)) {
-      assert.ok(!match[1].split(/\s+/).some(d => ['bloodinfo.in', 'admin.bloodinfo.in'].includes(d)), `Domain already owned by ${file}; review manually`);
+      assert.ok(!match[1].split(/\s+/).some(d => ['bloodinfo.in', 'admin.bloodinfo.in', 'hospital.bloodinfo.in'].includes(d)), `Domain already owned by ${file}; review manually`);
     }
   }
   console.log('DNS, production environment and exclusive domain ownership passed');

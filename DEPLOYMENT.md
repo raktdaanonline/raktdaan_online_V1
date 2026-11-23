@@ -11,23 +11,24 @@ is restarted, renamed or deleted.
 | --- | --- | --- | --- |
 | bloodinfo.in | bloodinfo_frontend | 80 | Frontend/ |
 | admin.bloodinfo.in | bloodinfo_admin | 80 | admin/ |
-| Both domains: /api/*, /socket.io/*, /uploads/* | bloodinfo_backend | 5000 | Backend/ |
+| hospital.bloodinfo.in | bloodinfo_hospital | 80 | hospital/ |
+| All domains: /api/*, /socket.io/*, /uploads/* | bloodinfo_backend | 5000 | Backend/ |
 
 Every domain has its own exact HTTP and HTTPS server block, including bootstrap.
-The frontend/admin Dockerfiles compile their own contexts and copy only their
+The frontend/admin/hospital Dockerfiles compile their own contexts and copy only their
 own builder's /app/dist. Docker DNS uses unique bloodinfo_* names. A Docker DNS
 resolver refreshes upstream IPs after app containers are replaced.
 
-All three services join bloodinfo_internal (a private, internal network) and
-existing external goairclass_proxy, so the central gateway can reach all three.
+All four services join bloodinfo_internal (a private, internal network) and
+existing external goairclass_proxy, so the central gateway can reach all four.
 The central gateway must already be attached to goairclass_proxy. Deployment
 fails safely if it is not; it never reconnects/recreates shared infrastructure.
 
-Responses include X-BloodInfo-App: frontend or admin. Each app also emits
+Responses include X-BloodInfo-App: frontend, admin, or hospital. Each app also emits
 /bloodinfo-build.json containing its app identifier, release SHA, HTML hash and
 build hash. Health checks compare HEAD headers, actual HTML, distinct hashes,
 exact commit, directly inspected container manifests, same-host redirects and
-shared backend readiness on BOTH domains. Headers alone cannot pass this check.
+shared backend readiness on ALL domains. Headers alone cannot pass this check.
 
 ## Deployment gates and required secrets
 
@@ -82,15 +83,15 @@ CERTBOT_EMAIL must contain a real email before first SSL issuance.
 
 ## First-deployment prerequisites
 
-1. DNS A records for @ (bloodinfo.in) and admin (admin.bloodinfo.in) must both
-   resolve only to 200.234.45.233. Remove conflicting AAAA records until an IPv6
+1. DNS A records for @ (bloodinfo.in), admin (admin.bloodinfo.in) and hospital (hospital.bloodinfo.in)
+   must all resolve only to 200.234.45.233. Remove conflicting AAAA records until an IPv6
    destination is explicitly configured. Deployment verifies DNS before any
    SSL request or app recreation; it never edits DNS provider records.
 2. Run sudo bash scripts/setup-vps.sh from a copy of this code to prepare only
    BloodInfo directories. Docker/Compose must already be installed. The script
    does not install or reconfigure server software.
 3. Supply the two production .env files above, with real service credentials.
-   FRONTEND_URL must be https://bloodinfo.in; PORT must be 5000 if present.
+   FRONTEND_URL must be https://bloodinfo.in; HOSPITAL_FRONTEND_URL must be https://hospital.bloodinfo.in; PORT must be 5000 if present.
 4. Review old resources from THIS project. Inspect Docker Compose project labels,
    mounts and contents before copying data; a name containing raktdaan is not
    proof of ownership. The deploy preflight only inventories these resources.
@@ -119,17 +120,17 @@ BloodInfo ownership marker also blocks replacement. No unrelated config or
 existing GymProPlus warning is modified. Every reload follows a successful
 nginx -t in gymproplus-nginx-1. Failure restores only the owned previous file.
 
-The dedicated certificate name is bloodinfo, covering exactly bloodinfo.in and
-admin.bloodinfo.in. Certificate/key paths in the gateway are
+The dedicated certificate name is bloodinfo, covering bloodinfo.in,
+admin.bloodinfo.in and hospital.bloodinfo.in. Certificate/key paths in the gateway are
 /etc/letsencrypt/live/bloodinfo/fullchain.pem and privkey.pem.
 
-If absent, deployment verifies DNS, installs TWO separate HTTP-only BloodInfo
+If absent, deployment verifies DNS, installs THREE separate HTTP-only BloodInfo
 blocks, tests/reloads the existing gateway, verifies a unique public ACME token
-on both domains, and requests only that certificate. It uses the existing host
+on all domains, and requests or expands that certificate. It uses the existing host
 webroot /var/lib/docker/volumes/gymproplus_certbot_www/_data, mounted as
 /var/www/certbot, and the existing gateway's detected certificate store.
 It then installs separate HTTPS routes and tests/reloads again. An existing
-certificate is reused; only a due BloodInfo certificate is renewed. Certbot
+certificate is reused; only an expiring or expanding BloodInfo certificate is updated. Certbot
 runs temporarily as bloodinfo_certbot with no host ports. It never renews
 other projects' certificates.
 
@@ -163,6 +164,7 @@ Local checks:
     node deploy/check-config.mjs
     npm run build --prefix Frontend
     npm run build --prefix admin
+    npm run build --prefix hospital
     node deploy/check-builds.mjs
 
 Docker/CI checks additionally require a running Docker daemon. Never run the

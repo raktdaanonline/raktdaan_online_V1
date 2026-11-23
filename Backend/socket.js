@@ -8,9 +8,12 @@ export const initSocket = (server) => {
       origin: (origin, callback) => {
         const allowed = [
           "http://localhost:5173",
+          "http://localhost:5174",
+          "http://localhost:5175",
           "http://localhost:3000",
           "https://bloodinfo.in",
           "https://admin.bloodinfo.in",
+          "https://hospital.bloodinfo.in",
         ];
         if (!origin || allowed.includes(origin) || origin.startsWith("http://192.168.") || origin.startsWith("http://localhost:")) {
           callback(null, true);

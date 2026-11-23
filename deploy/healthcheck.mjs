@@ -21,7 +21,7 @@ export function request(url, { ip, method = 'GET' } = {}) {
   });
 }
 export function validateApp({ app, commit, head, html, info, api, redirect, expected }) {
-  const domain = app === 'frontend' ? 'bloodinfo.in' : 'admin.bloodinfo.in';
+  const domain = app === 'frontend' ? 'bloodinfo.in' : (app === 'admin' ? 'admin.bloodinfo.in' : 'hospital.bloodinfo.in');
   for (const response of [head, html, info]) {
     assert.equal(response.status, 200, `${domain} must serve directly without redirects`);
     assert.equal(response.headers['x-bloodinfo-app'], app, `${domain}: wrong app header`);
@@ -42,7 +42,7 @@ export function validateApp({ app, commit, head, html, info, api, redirect, expe
 export async function checkLive({ commit, ip, expectedDir } = {}) {
   assert.match(commit || '', /^[a-f0-9]{40}$/, 'Expected exact release commit');
   const manifests = [];
-  for (const [domain, app] of [['bloodinfo.in', 'frontend'], ['admin.bloodinfo.in', 'admin']]) {
+  for (const [domain, app] of [['bloodinfo.in', 'frontend'], ['admin.bloodinfo.in', 'admin'], ['hospital.bloodinfo.in', 'hospital']]) {
     const base = `https://${domain}`;
     const options = { ip };
     const [head, html, info, api, redirect] = await Promise.all([
@@ -57,8 +57,10 @@ export async function checkLive({ commit, ip, expectedDir } = {}) {
   assertSeparateBuilds(manifests);
 }
 export function assertSeparateBuilds(manifests) {
-  assert.notEqual(manifests[0].htmlSha256, manifests[1].htmlSha256, 'Both domains serve the same HTML');
-  assert.notEqual(manifests[0].buildSha256, manifests[1].buildSha256, 'Both domains serve the same build');
+  const htmls = new Set(manifests.map(m => m.htmlSha256));
+  const builds = new Set(manifests.map(m => m.buildSha256));
+  assert.equal(htmls.size, manifests.length, 'All domains must serve distinct HTML');
+  assert.equal(builds.size, manifests.length, 'All domains must serve distinct builds');
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);

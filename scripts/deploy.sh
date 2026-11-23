@@ -11,9 +11,11 @@ cat <<'ARCHITECTURE'
 BloodInfo production preflight:
 Frontend source: Frontend -> bloodinfo_frontend:80
 Admin source: admin -> bloodinfo_admin:80
+Hospital source: hospital -> bloodinfo_hospital:80
 Backend source: Backend -> bloodinfo_backend:5000
 bloodinfo.in -> bloodinfo_frontend:80; /api/* -> bloodinfo_backend:5000
 admin.bloodinfo.in -> bloodinfo_admin:80; /api/* -> bloodinfo_backend:5000
+hospital.bloodinfo.in -> bloodinfo_hospital:80; /api/* -> bloodinfo_backend:5000
 Networks: bloodinfo_internal; external goairclass_proxy
 Host application ports: ZERO
 Gateway: existing gymproplus-nginx-1 (test and safe reload only)
@@ -61,13 +63,13 @@ rollback() {
 trap rollback EXIT
 
 export COMPOSE_PARALLEL_LIMIT=1
-for service in bloodinfo_backend bloodinfo_frontend bloodinfo_admin; do
+for service in bloodinfo_backend bloodinfo_frontend bloodinfo_admin bloodinfo_hospital; do
   "${COMPOSE[@]}" build --pull "$service"
 done
 app_changed=true
 "${COMPOSE[@]}" up -d --no-build --wait --wait-timeout 180 \
-  bloodinfo_backend bloodinfo_frontend bloodinfo_admin
-for app in frontend admin; do
+  bloodinfo_backend bloodinfo_frontend bloodinfo_admin bloodinfo_hospital
+for app in frontend admin hospital; do
   docker exec "bloodinfo_$app" wget -qO- http://127.0.0.1/bloodinfo-build.json > "$RELEASE_DIR/deploy/reports/$app.json"
 done
 ensure_bloodinfo_ssl
@@ -88,4 +90,4 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 CRON
 chmod 644 /etc/cron.d/bloodinfo-renew
 trap - EXIT
-echo "BloodInfo $SOURCE_COMMIT deployed; both domain headers, HTML fingerprints and APIs verified"
+echo "BloodInfo $SOURCE_COMMIT deployed; all domain headers, HTML fingerprints and APIs verified"
