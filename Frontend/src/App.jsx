@@ -10,6 +10,7 @@ import {
   Routes,
   Route,
   useLocation,
+  useParams,
   Navigate,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
@@ -33,6 +34,7 @@ import ScrollToTop from "./components/ScrollToTop";
 import CampRegistration from "./pages/public/CampRegistration";
 import BloodBanks from "./pages/BloodBanks";
 import ViewAllRequests from "./pages/ViewAllRequests";
+import EmergencyAlert from "./pages/EmergencyAlert";
 import PrivacyPolicy from "./pages/public/PrivacyPolicy";
 
 import OrganizerDashboard from "./pages/organizer/Dashboard";
@@ -60,6 +62,26 @@ import PublicBloodUnitQR from "./pages/bloodbank/PublicBloodUnitQR";
 import RequestFulfillment from "./pages/bloodbank/RequestFulfillment";
 import RequestPayment from "./pages/recipient/RequestPayment";
 import RequestStatusRecipient from "./pages/recipient/RequestStatus";
+
+/* ✅ Hospital Portal Seamless Redirect */
+const HospitalRedirect = () => {
+  const { token } = useParams();
+  useEffect(() => {
+    const targetUrl = token
+      ? `http://localhost:5175/register/${token}`
+      : `http://localhost:5175/login`;
+    window.location.href = targetUrl;
+  }, [token]);
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-900 text-white p-6 text-center">
+      <div>
+        <div className="w-10 h-10 border-4 border-rose-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <p className="font-bold text-sm">Redirecting to Hospital Clinical Portal...</p>
+      </div>
+    </div>
+  );
+};
 
 /* ✅ Footer wrapper */
 const Layout = () => {
@@ -97,6 +119,9 @@ const Layout = () => {
         <Route path="/" element={<Home />} />
         <Route path="/about" element={<About />} />
         <Route path="/services" element={<Services />} />
+        <Route path="/emergency-alert" element={<EmergencyAlert />} />
+        <Route path="/emergency" element={<Navigate to="/emergency-alert" replace />} />
+        <Route path="/accident-alert" element={<Navigate to="/emergency-alert" replace />} />
 
         <Route path="/register-camp" element={<DonorRegistration />} />
         <Route path="/register-camp/:campName" element={<DonorRegistration />} />
@@ -130,6 +155,11 @@ const Layout = () => {
         <Route path="/organizer-dashboard/reports" element={<OrganizerRoute><Reports /></OrganizerRoute>} />
         {/* /organizer-dashboard is handled by /organizer/dashboard above, but keeping for backward compatibility */}
         <Route path="/organizer-dashboard/:tab?" element={<OrganizerRoute><OrganizerDashboard /></OrganizerRoute>} />
+
+        {/* Hospital Portal Routes */}
+        <Route path="/hospital/register/:token" element={<HospitalRedirect />} />
+        <Route path="/hospital/login" element={<HospitalRedirect />} />
+        <Route path="/register/:token" element={<HospitalRedirect />} />
 
         {/* Blood Bank Routes */}
         <Route path="/blood-bank/register" element={<BloodBankRegister />} />

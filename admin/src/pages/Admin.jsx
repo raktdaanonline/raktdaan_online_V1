@@ -11,6 +11,9 @@ import HomeContentAdmin from "../components/HomeContentAdmin.jsx";
 import CityManagementAdmin from "../components/CityManagementAdmin.jsx";
 import EventCalendarAdmin from "../components/EventCalendarAdmin.jsx";
 import NotificationCenter from "../components/events/NotificationCenter.jsx";
+import AccidentSosManagement from "../components/AccidentSosManagement.jsx";
+import InviteHospital from "../components/InviteHospital.jsx";
+import HospitalRegistrationRequests from "../components/HospitalRegistrationRequests.jsx";
 import adminService from "../services/adminService";
 import campService from "../services/campService";
 import donorService from "../services/donorService";
@@ -1627,6 +1630,20 @@ const Admin = () => {
           >
             <span className="menu-item-icon">🏙️</span> <span className="menu-item-text">City Management</span>
           </button>
+          <button
+            className={`menu-item ${currentView === "invite-hospital" ? "active" : ""}`}
+            onClick={() => setCurrentView("invite-hospital")}
+            title="Invite Hospital"
+          >
+            <span className="menu-item-icon">✉️</span> <span className="menu-item-text">Invite Hospital</span>
+          </button>
+          <button
+            className={`menu-item ${currentView === "hospital-requests" ? "active" : ""}`}
+            onClick={() => setCurrentView("hospital-requests")}
+            title="Hospital Requests"
+          >
+            <span className="menu-item-icon">🩺</span> <span className="menu-item-text">Hospital Requests</span>
+          </button>
         </div>
 
         <div className="menu-section">
@@ -1687,7 +1704,12 @@ const Admin = () => {
         </div>
 
         <div className="emergency-button-container">
-          <button className="emergency-btn" onClick={() => setCurrentView("blood-requests")}>🚨 Emergency Requests</button>
+          <button 
+            className={`emergency-btn ${currentView === "emergency-sos" ? "ring-2 ring-white scale-[1.02]" : ""}`} 
+            onClick={() => setCurrentView("emergency-sos")}
+          >
+            🚨 Emergency Requests
+          </button>
         </div>
       </aside>
 
@@ -2913,6 +2935,27 @@ const Admin = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* ============================================================
+            VIEW: ACCIDENT & SOS EMERGENCY REQUESTS
+            ============================================================ */}
+        {currentView === "emergency-sos" && (
+          <AccidentSosManagement />
+        )}
+
+        {/* ============================================================
+            VIEW: INVITE HOSPITAL
+            ============================================================ */}
+        {currentView === "invite-hospital" && (
+          <InviteHospital />
+        )}
+
+        {/* ============================================================
+            VIEW: HOSPITAL REGISTRATION REQUESTS
+            ============================================================ */}
+        {currentView === "hospital-requests" && (
+          <HospitalRegistrationRequests />
         )}
 
         {/* --- 5. Organizers Tab View --- */}

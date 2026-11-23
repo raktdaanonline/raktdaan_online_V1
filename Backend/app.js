@@ -38,6 +38,9 @@ import requestFlowRoutes from "./routes/requestFlowRoutes.js";
 import cityRoutes from "./routes/cityRoutes.js";
 import eventRoutes from "./routes/eventRoutes.js";
 import adminNotificationRoutes from "./routes/adminNotificationRoutes.js";
+import emergencyAlertRoutes from "./routes/emergencyAlertRoutes.js";
+import hospitalAdminRoutes from "./routes/hospitalAdminRoutes.js";
+import hospitalPublicRoutes from "./routes/hospitalPublicRoutes.js";
 import expiryChecker from "./cron/expiryChecker.js";
 import licenseChecker from "./cron/licenseChecker.js";
 import eventReminderScheduler from "./cron/eventReminderScheduler.js";
@@ -47,7 +50,8 @@ app.set("trust proxy", 1); // Trust reverse proxy to get correct protocol (https
 const server = http.createServer(app);
 initSocket(server);
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // Readiness must include MongoDB, without sending messages or changing data.
 app.get(["/healthz", "/api/healthz"], (req, res) => {
@@ -61,6 +65,7 @@ app.use(
       const allowed = [
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://localhost:5175",
         "http://localhost:3000",
         "https://bloodinfo.in",
         "https://admin.bloodinfo.in",
@@ -187,6 +192,9 @@ app.use("/api/request-flow", requestFlowRoutes);
 app.use("/api/cities", cityRoutes);
 app.use("/api/admin/events", eventRoutes);
 app.use("/api/admin/notifications", adminNotificationRoutes);
+app.use("/api/emergency-alerts", emergencyAlertRoutes);
+app.use("/api/admin/hospitals", hospitalAdminRoutes);
+app.use("/api/hospital", hospitalPublicRoutes);
 
 // SERVE FRONTEND IN PRODUCTION (Hostinger Ready)
 const frontendPath = path.join(__dirname, "../Frontend/dist");

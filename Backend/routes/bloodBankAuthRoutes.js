@@ -11,6 +11,7 @@ import { verifyToken } from "../middleware/authMiddleware.js";
 import { generateToken, hashToken } from "../utils/tokenUtils.js";
 import { sendEmail } from "../utils/sendEmail.js";
 import { sendMessage } from "../whatsapp/waClient.js";
+import * as XLSX from "xlsx";
 
 const router = express.Router();
 
@@ -522,6 +523,245 @@ router.get("/all", verifyToken, async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: "Server error listing blood banks", error: error.message });
+  }
+});
+
+/* ======================================================
+   API: Admin — Export Blood Banks to Excel
+   GET /api/blood-bank/export-excel?city=...&status=...&search=...
+   Auth: admin
+====================================================== */
+router.get("/export-excel", verifyToken, async (req, res) => {
+  try {
+    const { status, city, search } = req.query;
+    const filter = {};
+
+    if (status && status !== "all") {
+      filter.status = status;
+    }
+
+    if (city && city !== "all") {
+      filter.city = new RegExp(`^${city.trim()}$`, "i");
+    }
+
+    if (search && search.trim()) {
+      const regex = new RegExp(search.trim(), "i");
+      filter.$or = [
+        { name: regex },
+        { managerName: regex },
+        { email: regex },
+        { mobile: regex },
+        { licenseNumber: regex },
+        { city: regex },
+        { state: regex },
+        { address: regex },
+      ];
+    }
+
+    const bloodBanks = await BloodBank.find(filter)
+      .select("-password -passwordToken -passwordTokenExpiresAt")
+      .sort({ city: 1, name: 1 });
+
+    const formatDate = (d) => {
+      if (!d) return "N/A";
+      const date = new Date(d);
+      if (isNaN(date.getTime())) return "N/A";
+      return date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    };
+
+    const calcUnits = (inv) => {
+      if (!inv) return 0;
+      let sum = 0;
+      const groups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"];
+      for (const g of groups) {
+        const item = inv[g];
+        if (typeof item === "number") {
+          sum += item;
+        } else if (item && typeof item === "object") {
+          sum += (Number(item.wholeBlood) || 0) +
+                 (Number(item.redCells) || 0) +
+                 (Number(item.platelets) || 0) +
+                 (Number(item.plasma) || 0);
+        }
+      }
+      return sum;
+    };
+
+    const mainRows = bloodBanks.map((b, idx) => {
+      const totalUnits = calcUnits(b.inventory);
+      const isExpired = b.licenseExpiryDate && new Date(b.licenseExpiryDate) < new Date();
+      const isExpiringSoon = b.licenseExpiryDate && !isExpired && (new Date(b.licenseExpiryDate) - new Date()) / (1000 * 60 * 60 * 24) <= 30;
+      const licenseStatus = !b.licenseExpiryDate
+        ? "Not Submitted"
+        : isExpired
+        ? "Expired"
+        : isExpiringSoon
+        ? "Expiring Soon (<30d)"
+        : "Valid";
+
+      const timings = (b.is24x7 || b.available24x7)
+        ? "24x7 Available"
+        : (b.openTime && b.closeTime ? `${b.openTime} - ${b.closeTime}` : (b.openingTime && b.closingTime ? `${b.openingTime} - ${b.closingTime}` : "N/A"));
+
+      const lat = b.latitude ?? (b.location?.coordinates?.[1] ?? "");
+      const lng = b.longitude ?? (b.location?.coordinates?.[0] ?? "");
+
+      return {
+        "S.No": idx + 1,
+        "Blood Bank Name": b.name || "N/A",
+        "City": b.city || "N/A",
+        "State": b.state || "N/A",
+        "Address": b.address || "N/A",
+        "Pincode": b.pincode || "N/A",
+        "Status": (b.status || "invited").toUpperCase(),
+        "Manager / Contact Person": b.managerName || "N/A",
+        "Email": b.email || "N/A",
+        "Mobile Number": b.mobile || "N/A",
+        "Emergency Contact": b.emergencyContact || "N/A",
+        "License Number": b.licenseNumber || "N/A",
+        "License Expiry Date": formatDate(b.licenseExpiryDate),
+        "License Status": licenseStatus,
+        "24x7 Operational": (b.is24x7 || b.available24x7) ? "Yes" : "No",
+        "Working Hours": timings,
+        "Verified by Admin": b.isVerified ? "Yes" : "No",
+        "Total Blood Units": totalUnits,
+        "Latitude": lat !== "" ? lat : "N/A",
+        "Longitude": lng !== "" ? lng : "N/A",
+        "Registered / Invited On": formatDate(b.createdAt || b.invitedAt),
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: All Blood Banks
+    const wsMain = XLSX.utils.json_to_sheet(mainRows);
+    wsMain["!cols"] = [
+      { wch: 6 },
+      { wch: 35 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 40 },
+      { wch: 10 },
+      { wch: 14 },
+      { wch: 25 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 24 },
+    ];
+    XLSX.utils.book_append_sheet(wb, wsMain, "Blood Banks");
+
+    // Sheet 2: City Summary
+    const cityMap = {};
+    bloodBanks.forEach((b) => {
+      const c = (b.city || "Unknown").trim();
+      if (!cityMap[c]) {
+        cityMap[c] = { total: 0, active: 0, pending: 0, invited: 0, suspended: 0, units: 0 };
+      }
+      cityMap[c].total += 1;
+      const st = (b.status || "invited").toLowerCase();
+      if (st === "active" || st === "approved") cityMap[c].active += 1;
+      else if (st === "pending") cityMap[c].pending += 1;
+      else if (st === "invited") cityMap[c].invited += 1;
+      else cityMap[c].suspended += 1;
+      cityMap[c].units += calcUnits(b.inventory);
+    });
+
+    const summaryRows = Object.keys(cityMap).sort().map((cityName, idx) => ({
+      "S.No": idx + 1,
+      "City": cityName,
+      "Total Blood Banks": cityMap[cityName].total,
+      "Active / Approved": cityMap[cityName].active,
+      "Pending Review": cityMap[cityName].pending,
+      "Invited": cityMap[cityName].invited,
+      "Suspended / Rejected": cityMap[cityName].suspended,
+      "Total Blood Units In Stock": cityMap[cityName].units,
+    }));
+
+    if (summaryRows.length > 0) {
+      const wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+      wsSummary["!cols"] = [
+        { wch: 6 },
+        { wch: 22 },
+        { wch: 18 },
+        { wch: 18 },
+        { wch: 16 },
+        { wch: 12 },
+        { wch: 22 },
+        { wch: 26 },
+      ];
+      XLSX.utils.book_append_sheet(wb, wsSummary, "City Summary");
+    }
+
+    // Sheet 3: Stock Inventory Breakdown
+    const getGroupUnits = (inv, group) => {
+      if (!inv || !inv[group]) return 0;
+      const item = inv[group];
+      if (typeof item === "number") return item;
+      if (typeof item === "object") {
+        return (Number(item.wholeBlood) || 0) +
+               (Number(item.redCells) || 0) +
+               (Number(item.platelets) || 0) +
+               (Number(item.plasma) || 0);
+      }
+      return 0;
+    };
+
+    const inventoryRows = bloodBanks.map((b, idx) => ({
+      "S.No": idx + 1,
+      "Blood Bank Name": b.name || "N/A",
+      "City": b.city || "N/A",
+      "Status": (b.status || "").toUpperCase(),
+      "A+": getGroupUnits(b.inventory, "A+"),
+      "A-": getGroupUnits(b.inventory, "A-"),
+      "B+": getGroupUnits(b.inventory, "B+"),
+      "B-": getGroupUnits(b.inventory, "B-"),
+      "O+": getGroupUnits(b.inventory, "O+"),
+      "O-": getGroupUnits(b.inventory, "O-"),
+      "AB+": getGroupUnits(b.inventory, "AB+"),
+      "AB-": getGroupUnits(b.inventory, "AB-"),
+      "Total Units": calcUnits(b.inventory),
+    }));
+
+    const wsInv = XLSX.utils.json_to_sheet(inventoryRows);
+    wsInv["!cols"] = [
+      { wch: 6 },
+      { wch: 35 },
+      { wch: 18 },
+      { wch: 14 },
+      { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+      { wch: 8 }, { wch: 8 }, { wch: 8 }, { wch: 8 },
+      { wch: 14 }
+    ];
+    XLSX.utils.book_append_sheet(wb, wsInv, "Stock Inventory");
+
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "buffer" });
+
+    const safeCity = city && city !== "all" ? city.trim().replace(/[^a-zA-Z0-9_-]/g, "_") : "All_Cities";
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `BloodBanks_${safeCity}_${dateStr}.xlsx`;
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Length", excelBuffer.length);
+    return res.send(excelBuffer);
+
+  } catch (error) {
+    console.error("Error exporting blood banks excel:", error);
+    res.status(500).json({ success: false, message: "Error generating Excel sheet", error: error.message });
   }
 });
 

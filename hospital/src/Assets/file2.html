@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="web_standard" name="shell-type"/>
+<title>Hospital Staff Portal - Raktadaan LifeDrop</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#b70011",
+            "primary-container": "#dc2626",
+            surface: "#f8f9ff"
+          },
+          fontFamily: {
+            sans: ["Inter", "sans-serif"]
+          }
+        }
+      }
+    }
+  </script>
+<style>
+    body {
+      font-family: 'Inter', sans-serif;
+    }
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="min-h-screen relative flex flex-col justify-between overflow-x-hidden text-slate-800 antialiased selection:bg-red-500 selection:text-white">
+<!-- Fixed Hospital Background Image with Overlay -->
+<div class="fixed inset-0 w-full h-full -z-20 overflow-hidden pointer-events-none">
+<img alt="Hospital Interior Trauma Unit" class="w-full h-full object-cover object-center filter blur-[1px] scale-105" src="https://lh3.googleusercontent.com/aida/ALJJyrBxDBU0L5tnKZcY9wpMXhMrAG7bNNteis68-vl6eFC2XiFSj73Y6MPfGPeh308ZTkppa0j_leHz2dbYuBASwPum-jg8zChD55UCDJu3RCdLjq8pgTlXdSjQjw3kyTYJNEswM7sLyds_Mbc5ZT5F65eRu2Nea6rkseNipW0czy0Wd3Bf0wY5CX8azPSZ5iXgTVpTxdsdYN_6vdbkmgQVlq-iAto2HfDOwM7Sl6-3TR6X0A"/>
+</div>
+<!-- Atmospheric Dark Tint Overlay -->
+<div class="fixed inset-0 w-full h-full -z-10 bg-[#0f172a]/75 backdrop-blur-[2px] pointer-events-none"></div>
+<!-- Top Navigation Bar -->
+<header class="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm relative z-30">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+<!-- Logo Branding -->
+<div class="flex items-center space-x-3">
+<div class="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center text-white shadow-md shadow-red-600/30">
+<span class="material-symbols-outlined text-2xl">water_drop</span>
+</div>
+<div>
+<span class="font-extrabold text-lg tracking-tight text-slate-900 block leading-tight">
+            Raktadaan <span class="text-red-600">LifeDrop</span>
+</span>
+<span class="text-[10px] tracking-wider font-semibold text-slate-500 uppercase block">Clinical Staff Portal</span>
+</div>
+</div>
+<!-- Center & Right Nav Elements -->
+<div class="flex items-center space-x-3 sm:space-x-6">
+<!-- 24/7 ER Hotline Badge -->
+<div class="hidden md:flex items-center space-x-2 bg-red-50 border border-red-200 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm">
+<span class="material-symbols-outlined text-sm text-red-600 animate-pulse">emergency</span>
+<span>24/7 ER HOTLINE:</span>
+<span class="font-black text-red-800 tracking-wide">1800-LIFEDROP</span>
+</div>
+<nav class="flex items-center space-x-4 text-xs font-semibold text-slate-700">
+<a class="text-red-600 font-bold hover:text-red-700 transition-colors" href="#">Portal Login</a>
+<span class="text-slate-300">|</span>
+<a class="hover:text-slate-900 transition-colors flex items-center space-x-1" href="#">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+<span>Network Status</span>
+</a>
+</nav>
+<!-- User profile roundel -->
+<div class="w-9 h-9 rounded-full bg-red-600 text-white flex items-center justify-center shadow-sm cursor-pointer hover:bg-red-700 transition">
+<span class="material-symbols-outlined text-lg">person</span>
+</div>
+</div>
+</div>
+</header>
+<!-- Main Centered Content Area -->
+<main class="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-20">
+<div class="w-full max-w-4xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-100 flex flex-col md:flex-row">
+<!-- Left Column (Slate-900 Institutional Summary) -->
+<div class="w-full md:w-5/12 bg-slate-900 text-white p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden">
+<!-- Subtle background glow -->
+<div class="absolute -top-24 -left-24 w-60 h-60 bg-red-600/15 rounded-full blur-3xl pointer-events-none"></div>
+<div class="relative z-10 space-y-6">
+<!-- Hospital Header Badge -->
+<div class="flex items-center space-x-3">
+<div class="w-11 h-11 bg-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-red-900/40">
+<span class="material-symbols-outlined text-white text-2xl">local_hospital</span>
+</div>
+<div>
+<h2 class="text-lg font-bold tracking-tight text-white leading-tight">City Care Hospital</h2>
+<p class="text-[11px] font-semibold tracking-wider text-red-300 uppercase">Hospital Panel • Staff Login</p>
+</div>
+</div>
+<!-- Clinical Gateway Pill -->
+<div class="bg-slate-800/80 backdrop-blur-sm border border-slate-700/60 rounded-xl p-3 flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<span class="material-symbols-outlined text-red-400 text-lg">hub</span>
+<div>
+<p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Clinical Gateway</p>
+<p class="text-xs font-semibold text-slate-200">Raktadaan LifeDrop Network</p>
+</div>
+</div>
+<span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              ONLINE SYNC
+            </span>
+</div>
+<!-- Feature Pills List -->
+<div class="space-y-3.5 pt-1">
+<div class="flex items-start space-x-3 group">
+<div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center shrink-0 mt-0.5 text-red-400">
+<span class="material-symbols-outlined text-base">emergency_share</span>
+</div>
+<div>
+<h4 class="text-xs font-bold text-slate-100 leading-tight">STAT Golden Hour Dispatch</h4>
+<p class="text-[11px] text-slate-400 leading-snug mt-0.5">Real-time automated blood matching and drone/ER ambulance routing.</p>
+</div>
+</div>
+<div class="flex items-start space-x-3 group">
+<div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center shrink-0 mt-0.5 text-red-400">
+<span class="material-symbols-outlined text-base">lock_clock</span>
+</div>
+<div>
+<h4 class="text-xs font-bold text-slate-100 leading-tight">Critical Reserve Locking</h4>
+<p class="text-[11px] text-slate-400 leading-snug mt-0.5">Direct terminal reservation for emergency trauma suites and ICUs.</p>
+</div>
+</div>
+<div class="flex items-start space-x-3 group">
+<div class="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700/60 flex items-center justify-center shrink-0 mt-0.5 text-red-400">
+<span class="material-symbols-outlined text-base">verified_user</span>
+</div>
+<div>
+<h4 class="text-xs font-bold text-slate-100 leading-tight">Hardware Node Verification</h4>
+<p class="text-[11px] text-slate-400 leading-snug mt-0.5">DPDP &amp; NABH Level 3 certified authenticated terminal access.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- 24/7 ER Helpline Box -->
+<div class="relative z-10 mt-8 pt-4 border-t border-slate-800 flex items-center justify-between">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-full bg-red-600/20 text-red-400 flex items-center justify-center">
+<span class="material-symbols-outlined text-base">call</span>
+</div>
+<div>
+<p class="text-[10px] uppercase font-bold text-slate-400 tracking-wider">24/7 Hospital ER Helpline</p>
+<p class="text-sm font-bold text-white tracking-wide">+91 20 6645 5100</p>
+</div>
+</div>
+<span class="text-[11px] font-bold bg-slate-800 text-slate-300 px-2.5 py-1 rounded-md border border-slate-700">
+            Ext 9
+          </span>
+</div>
+</div>
+<!-- Right Column (White Card Form) -->
+<div class="w-full md:w-7/12 bg-white p-6 sm:p-10 flex flex-col justify-between">
+<div>
+<!-- Title & Terminal Badge -->
+<div class="flex items-start justify-between">
+<div>
+<h1 class="text-2xl font-bold text-slate-900 tracking-tight">Hospital Staff Portal</h1>
+<p class="text-xs text-slate-500 mt-1">Sign in with verified clinical credentials to access trauma console.</p>
+</div>
+<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 shadow-sm shrink-0">
+<span class="material-symbols-outlined text-sm text-blue-600">terminal</span>
+              Terminal v4.8
+            </span>
+</div>
+<!-- Sign-in Form -->
+<form class="mt-7 space-y-5" onsubmit="event.preventDefault();">
+<!-- Email Field -->
+<div>
+<label class="block text-xs font-bold text-slate-700 tracking-wider uppercase mb-1.5" for="email">
+                Email ID
+              </label>
+<div class="relative rounded-xl shadow-sm">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-lg">mail</span>
+</div>
+<input class="block w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 transition" id="email" name="email" placeholder="name@hospital.org" required="" type="email" value="dr.mehta@citycarehospital.in"/>
+</div>
+</div>
+<!-- Password Field -->
+<div>
+<div class="flex items-center justify-between mb-1.5">
+<label class="block text-xs font-bold text-slate-700 tracking-wider uppercase" for="password">
+                  Password
+                </label>
+<a class="text-xs font-semibold text-red-600 hover:text-red-700 hover:underline" href="#">
+                  Forgot Password?
+                </a>
+</div>
+<div class="relative rounded-xl shadow-sm">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+<span class="material-symbols-outlined text-lg">lock</span>
+</div>
+<input class="block w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-sm font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-red-600 tracking-widest transition" id="password" name="password" required="" type="password" value="••••••••••••"/>
+<button class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer" type="button">
+<span class="material-symbols-outlined text-lg">visibility</span>
+</button>
+</div>
+</div>
+<!-- Keep Logged In Checkbox -->
+<div class="flex items-center pt-1">
+<input checked="" class="h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer" id="shift-login" name="shift-login" type="checkbox"/>
+<label class="ml-2.5 text-xs font-semibold text-slate-700 cursor-pointer select-none" for="shift-login">
+                Keep logged in for 12h Duty Shift
+              </label>
+</div>
+<!-- Red CTA Button -->
+<button class="w-full bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-bold py-3 px-5 rounded-xl text-sm tracking-wide shadow-lg shadow-red-600/30 hover:shadow-red-600/40 transform active:scale-[0.99] transition duration-150 flex items-center justify-center space-x-2" type="submit">
+<span>➔</span>
+<span>SECURE LOGIN TO HOSPITAL PANEL</span>
+<span>➔</span>
+</button>
+</form>
+</div>
+<!-- Compliance / PHI Notice -->
+<div class="mt-8 pt-4 border-t border-slate-100 flex items-start space-x-2.5 text-slate-500">
+<span class="material-symbols-outlined text-slate-400 text-base shrink-0 mt-0.5">policy</span>
+<p class="text-[11px] leading-relaxed text-slate-500">
+<span class="font-bold text-slate-700">Protected Health Information (PHI)</span> console under India Digital Personal Data Protection (DPDP) Act. All terminal queries, unit requisitions, and emergency requests are logged with timestamped IP audit trails.
+          </p>
+</div>
+</div>
+</div>
+</main>
+<!-- Clean Bottom Footer -->
+<footer class="w-full relative z-20 py-4 text-center text-xs text-slate-300 border-t border-white/10 bg-black/20 backdrop-blur-sm">
+<div class="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+<p>© 2025 Raktadaan LifeDrop Healthcare Network. All rights reserved.</p>
+<div class="flex items-center space-x-4 text-slate-400 text-[11px]">
+<a class="hover:text-white transition" href="#">Clinical Guidelines</a>
+<span>•</span>
+<a class="hover:text-white transition" href="#">NABH Compliance</a>
+<span>•</span>
+<a class="hover:text-white transition" href="#">Emergency Dispatch Desk</a>
+</div>
+</div>
+</footer>
+</body></html>

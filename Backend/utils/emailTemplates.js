@@ -158,6 +158,143 @@ export const emailTemplates = {
       <br/>
       <p>Thank you,<br/>Raktdaan Team</p>
     </div>
-  `
+  `,
+
+  hospitalInvitation: (hospitalName, registrationUrl) => `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+      <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center; border-bottom: 3px solid #e11d48;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+          Raktdaan <span style="color: #f43f5e;">LifeDrop</span> Network
+        </h1>
+        <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 13px;">Clinical Healthcare & Trauma Support Integration</p>
+      </div>
+
+      <div style="padding: 32px 28px; color: #1e293b; line-height: 1.6;">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 700;">You Are Invited to Register Your Hospital</h2>
+        <p style="color: #475569; font-size: 15px;">Hello,</p>
+        <p style="color: #475569; font-size: 15px;">
+          You have been officially invited to join our nationwide <strong>Blood Donation & Trauma Response Platform</strong>.
+        </p>
+
+        <div style="background-color: #f8fafc; border-left: 4px solid #e11d48; padding: 14px 18px; border-radius: 6px; margin: 20px 0;">
+          <div style="font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.5px;">Designated Hospital Entity</div>
+          <div style="font-size: 17px; font-weight: 700; color: #0f172a; margin-top: 2px;">${hospitalName}</div>
+        </div>
+
+        <p style="color: #475569; font-size: 14px;">
+          Please click the button below to complete your hospital registration, enter your exact geographical coordinates, and configure clinical access credentials.
+        </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${registrationUrl}" style="display: inline-block; background-color: #e11d48; color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);">
+            Complete Hospital Registration &rarr;
+          </a>
+        </div>
+
+        <p style="font-size: 12px; color: #64748b; line-height: 1.5;">
+          Direct registration link: <br/>
+          <a href="${registrationUrl}" style="color: #e11d48; word-break: break-all;">${registrationUrl}</a>
+        </p>
+
+        <div style="margin-top: 24px; padding: 12px; background-color: #fff1f2; border-radius: 6px; border: 1px solid #ffe4e6; font-size: 12px; color: #9f1239;">
+          ⏱️ <strong>Security Notice:</strong> This invitation token is secure, unique, and expires in <strong>48 hours</strong>. It will become invalid automatically after successful registration.
+        </div>
+      </div>
+
+      <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 28px; text-align: center; font-size: 12px; color: #94a3b8;">
+        © ${new Date().getFullYear()} Raktdaan Healthcare Network • Secure Hospital Integration Desk
+      </div>
+    </div>
+  `,
+
+  hospitalApproval: (hospitalName, email, loginUrl) => `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+      <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); padding: 28px 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 22px; font-weight: 800;">
+          Hospital Registration Approved ✅
+        </h1>
+        <p style="color: #a7f3d0; margin: 6px 0 0 0; font-size: 13px;">Raktdaan LifeDrop Trauma & Clinical Network</p>
+      </div>
+
+      <div style="padding: 32px 28px; color: #1e293b; line-height: 1.6;">
+        <h2 style="color: #0f172a; margin-top: 0; font-size: 18px; font-weight: 700;">Hello ${hospitalName},</h2>
+        <p style="color: #475569; font-size: 15px;">
+          Congratulations! Your hospital registration request has been <strong>approved</strong> by the Admin team.
+        </p>
+
+        <p style="color: #475569; font-size: 15px;">
+          Your clinical console and emergency trauma desk are now fully activated. You can now access your Hospital Dashboard to coordinate emergency accident alerts and manage blood requests.
+        </p>
+
+        <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; margin: 20px 0;">
+          <div style="font-size: 13px; color: #166534; font-weight: 600;">Account Login Details</div>
+          <p style="margin: 6px 0 0 0; font-size: 14px; color: #0f172a;">
+            <strong>Login Email:</strong> <span style="color: #047857;">${email}</span>
+          </p>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #64748b;">
+            Please log in using the secure password you created during registration.
+          </p>
+        </div>
+
+        <div style="text-align: center; margin: 28px 0;">
+          <a href="${loginUrl}" style="display: inline-block; background-color: #059669; color: #ffffff; font-size: 15px; font-weight: 700; text-decoration: none; padding: 14px 28px; border-radius: 8px; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.25);">
+            Access Hospital Dashboard &rarr;
+          </a>
+        </div>
+
+        <p style="font-size: 12px; color: #64748b;">
+          Portal URL: <a href="${loginUrl}" style="color: #059669;">${loginUrl}</a>
+        </p>
+
+        <p style="font-size: 13px; color: #475569; margin-top: 24px;">
+          Thank you for joining our mission to save lives.
+        </p>
+      </div>
+
+      <div style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 16px 28px; text-align: center; font-size: 12px; color: #94a3b8;">
+        © ${new Date().getFullYear()} Raktdaan Healthcare Network
+      </div>
+    </div>
+  `,
+
+  hospitalRejection: (hospitalName, reason) => `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+      <div style="background: #1e293b; padding: 24px; text-align: center;">
+        <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 700;">
+          Hospital Registration Status Update
+        </h1>
+        <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 12px;">Raktdaan LifeDrop Network</p>
+      </div>
+
+      <div style="padding: 28px; color: #1e293b; line-height: 1.6;">
+        <p>Hello <strong>${hospitalName}</strong>,</p>
+        <p style="color: #475569;">
+          Thank you for your interest in joining the Raktdaan Healthcare Network.
+        </p>
+        <p style="color: #475569;">
+          After review, your hospital registration request could not be approved at this time.
+        </p>
+
+        ${
+          reason
+            ? `<div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 20px 0; border-radius: 4px;">
+                <strong style="color: #991b1b; font-size: 13px;">Reason from Administration:</strong>
+                <p style="margin: 4px 0 0 0; color: #7f1d1d; font-size: 14px;">${reason}</p>
+              </div>`
+            : ""
+        }
+
+        <p style="color: #64748b; font-size: 13px;">
+          If you believe this is an error or would like to provide updated credentials, please contact our administrative desk at support@raktdaan.online.
+        </p>
+
+        <p style="margin-top: 24px; color: #334155; font-size: 14px;">
+          Regards,<br/>
+          <strong>Raktdaan Administrative Team</strong>
+        </p>
+      </div>
+    </div>
+  `,
 };
+
 

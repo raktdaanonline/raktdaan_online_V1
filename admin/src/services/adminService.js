@@ -73,6 +73,13 @@ const adminService = {
     const res = await api.get("/blood-bank/all", { params });
     return res.data;
   },
+  exportBloodBanksExcel: async (params) => {
+    const res = await api.get("/blood-bank/export-excel", {
+      params,
+      responseType: "blob",
+    });
+    return res;
+  },
   getBloodBankStats: async () => {
     const res = await api.get("/blood-bank/stats");
     return res.data;
@@ -178,6 +185,44 @@ const adminService = {
     const res = await api.post("/cities/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     });
+    return res.data;
+  },
+
+  // Hospital Invitation & Approval System
+  inviteHospital: async (data) => {
+    const res = await api.post("/admin/hospitals/invite", data);
+    return res.data;
+  },
+  getHospitalInvitations: async () => {
+    const res = await api.get("/admin/hospitals/invitations");
+    return res.data;
+  },
+  getHospitalInvitationLink: async (id) => {
+    const res = await api.get(`/admin/hospitals/invitations/${id}/link`);
+    return res.data;
+  },
+  resendHospitalInvitation: async (id) => {
+    const res = await api.post(`/admin/hospitals/invitations/${id}/resend`);
+    return res.data;
+  },
+  cancelHospitalInvitation: async (id) => {
+    const res = await api.delete(`/admin/hospitals/invitations/${id}`);
+    return res.data;
+  },
+  getHospitalRequests: async () => {
+    const res = await api.get("/admin/hospitals/requests");
+    return res.data;
+  },
+  getHospitalRequestDetails: async (id) => {
+    const res = await api.get(`/admin/hospitals/requests/${id}`);
+    return res.data;
+  },
+  approveHospital: async (id) => {
+    const res = await api.patch(`/admin/hospitals/${id}/approve`);
+    return res.data;
+  },
+  rejectHospital: async (id, reason) => {
+    const res = await api.patch(`/admin/hospitals/${id}/reject`, { reason });
     return res.data;
   },
 };

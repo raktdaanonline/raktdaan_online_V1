@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
-import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key, ChevronDown, ChevronLeft, ChevronRight, Edit3, Trash2, Save, CheckCircle2, Navigation } from "lucide-react";
+import { Search, MapPin, Building, ShieldCheck, Ban, Plus, Eye, X, FileText, ExternalLink, RefreshCw, AlertTriangle, ShieldAlert, Clock, Copy, Check, Key, ChevronDown, ChevronLeft, ChevronRight, Edit3, Trash2, Save, CheckCircle2, Navigation, Download, FileSpreadsheet } from "lucide-react";
 import adminService from "../services/adminService";
 import AdminInviteBloodBank from "./AdminInviteBloodBank";
 
@@ -21,6 +21,11 @@ export default function AdminBloodBanks() {
 
   const [selectedCity, setSelectedCity] = useState("all");
   const [citiesList, setCitiesList] = useState([]);
+
+  // Excel Export State
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const exportMenuRef = useRef(null);
 
   // Backend Pagination State (15 items per page)
   const [currentPage, setCurrentPage] = useState(1);
@@ -191,6 +196,61 @@ export default function AdminBloodBanks() {
       toast.error(err.response?.data?.message || "Error generating password link");
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  // Close export dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target)) {
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Handle Excel Export (All or City-wise)
+  const handleExportExcel = async (cityToExport = selectedCity) => {
+    setExportLoading(true);
+    setShowExportMenu(false);
+    try {
+      const params = {};
+      if (activeTab && activeTab !== "all") params.status = activeTab;
+      if (cityToExport && cityToExport !== "all") params.city = cityToExport;
+      if (searchQuery && searchQuery.trim()) params.search = searchQuery.trim();
+
+      const res = await adminService.exportBloodBanksExcel(params);
+
+      let filename = `BloodBanks_${cityToExport !== "all" ? cityToExport.replace(/\s+/g, "_") : "All_Cities"}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const disposition = res.headers?.["content-disposition"];
+      if (disposition && disposition.indexOf("filename=") !== -1) {
+        const match = disposition.match(/filename="?([^";]+)"?/);
+        if (match && match[1]) filename = match[1];
+      }
+
+      const blob = new Blob([res.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      toast.success(
+        cityToExport !== "all"
+          ? `Downloaded ${cityToExport} Blood Banks Excel!`
+          : "Downloaded All Blood Banks Excel!"
+      );
+    } catch (err) {
+      console.error("Export error:", err);
+      toast.error("Failed to export Excel. Please try again.");
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -457,6 +517,108 @@ export default function AdminBloodBanks() {
           >
             <Plus className="w-4 h-4" /> Invite Blood Bank
           </button>
+
+          {/* Export Excel Button with All and City-wise Dropdown */}
+          <div className="relative" ref={exportMenuRef}>
+            <div className="flex items-center shadow-lg shadow-emerald-600/20 rounded-lg overflow-hidden border border-emerald-500/30">
+              <button
+                onClick={() => handleExportExcel(selectedCity)}
+                disabled={exportLoading}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-3.5 py-2 font-bold text-xs transition-all cursor-pointer whitespace-nowrap"
+                title={selectedCity !== "all" ? `Download Excel for ${selectedCity}` : "Download All Blood Banks as Excel"}
+              >
+                {exportLoading ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Exporting...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+                    <span>{selectedCity !== "all" ? `Export (${selectedCity})` : "Export Excel (All)"}</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                disabled={exportLoading}
+                className="bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white px-2 py-2 border-l border-emerald-500/40 cursor-pointer transition-all flex items-center justify-center h-full"
+                title="More Excel Download Options (All Cities or Pick City)"
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showExportMenu ? "rotate-180" : ""}`} />
+              </button>
+            </div>
+
+            {/* Dropdown Menu */}
+            {showExportMenu && (
+              <div className="absolute right-0 mt-2 w-72 bg-[#1e293b] border border-zinc-700 rounded-xl shadow-2xl z-50 py-2 text-xs backdrop-blur-md">
+                <div className="px-3.5 py-1.5 text-[10px] uppercase font-bold text-zinc-400 border-b border-zinc-700/80 flex items-center justify-between">
+                  <span>Excel Export Options</span>
+                  <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+                </div>
+
+                <div className="p-1 space-y-0.5">
+                  <button
+                    onClick={() => handleExportExcel("all")}
+                    className="w-full text-left px-3 py-2 text-white hover:bg-emerald-600/20 hover:text-emerald-300 rounded-lg flex items-center justify-between cursor-pointer transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+                      <div>
+                        <div className="font-semibold text-zinc-100">Download All Blood Banks</div>
+                        <div className="text-[10px] text-zinc-400">All registered blood banks ({stats.total || "all"})</div>
+                      </div>
+                    </span>
+                    <span className="text-[10px] bg-emerald-950/80 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30 font-bold">
+                      All Cities
+                    </span>
+                  </button>
+
+                  {selectedCity !== "all" && (
+                    <button
+                      onClick={() => handleExportExcel(selectedCity)}
+                      className="w-full text-left px-3 py-2 text-white hover:bg-emerald-600/20 hover:text-emerald-300 rounded-lg flex items-center justify-between cursor-pointer transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-emerald-400" />
+                        <div>
+                          <div className="font-semibold text-zinc-100">Download {selectedCity} Only</div>
+                          <div className="text-[10px] text-zinc-400">Currently selected filter</div>
+                        </div>
+                      </span>
+                      <span className="text-[10px] bg-blue-950/80 text-blue-300 px-2 py-0.5 rounded-full border border-blue-500/30 font-bold">
+                        Filtered
+                      </span>
+                    </button>
+                  )}
+                </div>
+
+                {citiesList.length > 0 && (
+                  <div className="border-t border-zinc-700/80 mt-1 pt-1.5 px-1">
+                    <div className="px-2.5 py-1 text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">
+                      Or Choose Specific City
+                    </div>
+                    <div className="max-h-48 overflow-y-auto px-1 space-y-0.5 custom-scrollbar">
+                      {citiesList.map((c) => (
+                        <button
+                          key={c._id || c.name}
+                          onClick={() => handleExportExcel(c.name)}
+                          className="w-full text-left px-2.5 py-1.5 text-zinc-300 hover:bg-zinc-800 hover:text-emerald-300 rounded-md text-[11px] flex items-center justify-between cursor-pointer transition-colors"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3 h-3 text-zinc-500" />
+                            <span>{c.name}</span>
+                          </span>
+                          <Download className="w-3 h-3 text-zinc-500 hover:text-emerald-400" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* City Filter Dropdown */}
           <div className="relative">

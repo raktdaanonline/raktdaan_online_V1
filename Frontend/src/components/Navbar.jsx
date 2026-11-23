@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { User, Menu, X, ChevronDown, Home, Users, Droplet, Building2, MapPin } from "lucide-react";
+import { User, Menu, X, ChevronDown, Home, Users, Droplet, Building2, MapPin, AlertTriangle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import LocationSelector from "./LocationSelector";
 
@@ -90,6 +90,7 @@ export default function Navbar() {
       { to: "/about", label: "About Us", icon: Users },
       { to: "/services", label: "Services", icon: Droplet },
       { to: "/blood-banks", label: "Blood Banks", icon: Building2 },
+      { to: "/emergency-alert", label: "Emergency Alert", icon: AlertTriangle, isEmergency: true },
     ];
   }, []);
 
@@ -122,23 +123,44 @@ export default function Navbar() {
         </NavLink>
 
         {/* DESKTOP NAV */}
-        <nav className="hidden md:flex items-center gap-8">
-          {NAV_ITEMS_WITH_ICONS.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                `text-[14px] font-bold no-underline transition-all duration-300 relative py-1
-                  ${isActive
-                  ? "text-red-500 after:content-[''] after:absolute after:left-0 after:bottom-[-6px] after:w-full after:h-[2.5px] after:rounded-full after:bg-red-500"
-                  : "text-zinc-300 hover:text-red-500"
-                }`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+        <nav className="hidden md:flex items-center gap-6 lg:gap-8">
+          {NAV_ITEMS_WITH_ICONS.map((item) => {
+            const Icon = item.icon;
+            if (item.isEmergency) {
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `text-[13px] font-bold no-underline transition-all duration-300 flex items-center gap-1.5 px-3 py-1.5 rounded-full border ${
+                      isActive
+                        ? "bg-red-600 text-white border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.5)]"
+                        : "bg-red-600/15 text-red-400 border-red-500/40 hover:bg-red-600 hover:text-white hover:border-red-500 shadow-[0_0_10px_rgba(220,38,38,0.2)]"
+                    }`
+                  }
+                >
+                  <Icon className="w-3.5 h-3.5 animate-pulse text-red-500 group-hover:text-white" />
+                  <span>{item.label}</span>
+                </NavLink>
+              );
+            }
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  `text-[14px] font-bold no-underline transition-all duration-300 relative py-1
+                    ${isActive
+                    ? "text-red-500 after:content-[''] after:absolute after:left-0 after:bottom-[-6px] after:w-full after:h-[2.5px] after:rounded-full after:bg-red-500"
+                    : "text-zinc-300 hover:text-red-500"
+                  }`
+                }
+              >
+                {item.label}
+              </NavLink>
+            );
+          })}
         </nav>
 
         <div className="hidden md:flex items-center gap-4">
@@ -204,11 +226,13 @@ export default function Navbar() {
                     `flex items-center gap-3 p-4 rounded-xl text-sm font-semibold transition-all duration-300 no-underline
                       ${isActive
                         ? "bg-red-600 text-white font-bold"
-                        : "bg-[#111113] text-zinc-300 hover:border-red-500/50 hover:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
+                        : item.isEmergency
+                          ? "bg-red-950/40 text-red-400 border border-red-600/40 hover:bg-red-900/50"
+                          : "bg-[#111113] text-zinc-300 hover:border-red-500/50 hover:shadow-[0_0_10px_rgba(239,68,68,0.15)]"
                       }`
                   }
                   style={({ isActive }) => 
-                    isActive ? {} : { border: "1px solid rgba(63, 63, 70, 0.3)" }
+                    isActive || item.isEmergency ? {} : { border: "1px solid rgba(63, 63, 70, 0.3)" }
                   }
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
@@ -216,8 +240,13 @@ export default function Navbar() {
                     const Icon = item.icon;
                     return (
                       <>
-                        <Icon className={`w-5 h-5 ${isActive ? "text-white" : "text-zinc-400"}`} />
-                        <span>{item.label}</span>
+                        <Icon className={`w-5 h-5 ${isActive ? "text-white" : item.isEmergency ? "text-red-500 animate-pulse" : "text-zinc-400"}`} />
+                        <span className={item.isEmergency ? "font-bold text-red-400" : ""}>{item.label}</span>
+                        {item.isEmergency && (
+                          <span className="ml-auto text-[10px] bg-red-600 text-white px-2 py-0.5 rounded-full uppercase tracking-wider font-extrabold animate-pulse">
+                            Live
+                          </span>
+                        )}
                       </>
                     );
                   }}
