@@ -123,7 +123,8 @@ async function runTestSuite() {
       idempotencyKey: "pending_key_1",
     },
   ];
-  const newEventDate = new Date("2026-10-25T00:00:00.000Z");
+  // Use a future date so pending reminders calculate as pending instead of cancelled past reminders
+  const newEventDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   const reconciled = reconcileReminders(
     existingReminders,
     newEventDate,
